@@ -27,6 +27,7 @@ import com.project.utils.InputHandler;
 import com.project.weapons.WeaponStats;
 import com.project.weapons.WeaponType;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -124,7 +125,7 @@ public class GameApp extends SimpleApplication {
     /** Countdown until the next replayed shot fires. */
     private float   blackHoleSpewTimer   = 0f;
     /** Stack of projectile snapshots accumulated during the recording window. */
-    private final List<ProjectileSnapshot> blackHoleStack = new ArrayList<>();
+    private final ArrayDeque<ProjectileSnapshot> blackHoleStack = new ArrayDeque<>();
 
     /** Immutable data snapshot of a single fired projectile for black-hole replay. */
     private static final class ProjectileSnapshot {
@@ -471,14 +472,16 @@ public class GameApp extends SimpleApplication {
             float spewInterval = BLACK_HOLE_BASE_SPEW_INTERVAL
                     / upgradeManager.getBlackHoleSpewRateMult();
             while (blackHoleSpewTimer <= 0f && !blackHoleStack.isEmpty()) {
-                ProjectileSnapshot snap = blackHoleStack.remove(0);
-                // Fire the replayed projectile from the player's current position
+                ProjectileSnapshot snap = blackHoleStack.pollFirst();
+                // Fire the replayed projectile from the player's current position,
+                // applying any bonus pierce earned from Black Hole Depth upgrades.
+                int replayPierce = snap.pierce + upgradeManager.getBlackHoleExtraPierce();
                 Projectile proj = new Projectile(
                         assetManager,
                         player.getPosition().x, player.getPosition().z,
                         snap.dirX, snap.dirZ,
                         snap.speed, snap.damage, snap.bulletSize,
-                        snap.pierce, snap.ricochet,
+                        replayPierce, snap.ricochet,
                         Constants.LEVEL_HALF_WIDTH, Constants.LEVEL_HALF_HEIGHT
                 );
                 projectiles.add(proj);
