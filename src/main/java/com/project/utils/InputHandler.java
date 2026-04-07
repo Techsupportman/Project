@@ -21,10 +21,11 @@ import com.jme3.math.Vector2f;
  *
  * <h3>One-shot inputs</h3>
  * <ul>
- *   <li>P — pause/resume</li>
+ *   <li>P / ESC — pause/resume</li>
  *   <li>R — restart</li>
  *   <li>Right Mouse Button — toggle circle/cone vision</li>
- *   <li>Q/E — cycle weapon</li>
+ *   <li>Q — toggle fire lock (auto-fire)</li>
+ *   <li>E — cycle weapon</li>
  *   <li>1-9 — confirm level-up choice index</li>
  * </ul>
  */
@@ -40,8 +41,10 @@ public class InputHandler implements ActionListener {
     private static final String FIRE           = "Fire";
     private static final String VISION_TOGGLE  = "VisionToggle";
     private static final String PAUSE          = "Pause";
+    private static final String ESCAPE         = "Escape";
     private static final String RESTART        = "Restart";
     private static final String CYCLE_WEAPON   = "CycleWeapon";
+    private static final String FIRE_LOCK      = "FireLock";
     private static final String CHOICE_1       = "Choice1";
     private static final String CHOICE_2       = "Choice2";
     private static final String CHOICE_3       = "Choice3";
@@ -57,13 +60,16 @@ public class InputHandler implements ActionListener {
     private boolean moveRight;
     private boolean moveUp;
     private boolean moveDown;
-    private boolean fireHeld;   // LMB held
+    private boolean fireHeld;      // LMB held
+    private boolean lmbJustPressed; // LMB pressed this frame (one-shot, for menu clicks)
 
     // One-shot flags
     private boolean visionTogglePending;
     private boolean pausePending;
+    private boolean escapePending;
     private boolean restartPending;
     private boolean cycleWeaponPending;
+    private boolean fireLockPending;
     private int     choicePending = -1;  // -1 = no pending choice
     private boolean rerollPending;
     private boolean deletePending;
@@ -103,12 +109,14 @@ public class InputHandler implements ActionListener {
 
         // System
         inputManager.addMapping(PAUSE,   new KeyTrigger(KeyInput.KEY_P));
+        inputManager.addMapping(ESCAPE,  new KeyTrigger(KeyInput.KEY_ESCAPE));
         inputManager.addMapping(RESTART, new KeyTrigger(KeyInput.KEY_R));
 
-        // Weapon cycling
-        inputManager.addMapping(CYCLE_WEAPON,
-                new KeyTrigger(KeyInput.KEY_Q),
-                new KeyTrigger(KeyInput.KEY_E));
+        // Weapon cycling (E only; Q is now fire-lock)
+        inputManager.addMapping(CYCLE_WEAPON, new KeyTrigger(KeyInput.KEY_E));
+
+        // Fire lock toggle
+        inputManager.addMapping(FIRE_LOCK, new KeyTrigger(KeyInput.KEY_Q));
 
         // Level-up choices (1-5) and meta-actions
         inputManager.addMapping(CHOICE_1, new KeyTrigger(KeyInput.KEY_1));
@@ -121,7 +129,7 @@ public class InputHandler implements ActionListener {
 
         inputManager.addListener(this,
                 MOVE_LEFT, MOVE_RIGHT, MOVE_UP, MOVE_DOWN,
-                FIRE, VISION_TOGGLE, PAUSE, RESTART, CYCLE_WEAPON,
+                FIRE, VISION_TOGGLE, PAUSE, ESCAPE, RESTART, CYCLE_WEAPON, FIRE_LOCK,
                 CHOICE_1, CHOICE_2, CHOICE_3, CHOICE_4, CHOICE_5,
                 REROLL, DELETE);
 
@@ -139,11 +147,13 @@ public class InputHandler implements ActionListener {
             case MOVE_RIGHT    -> moveRight = isPressed;
             case MOVE_UP       -> moveUp    = isPressed;
             case MOVE_DOWN     -> moveDown  = isPressed;
-            case FIRE          -> fireHeld  = isPressed;
+            case FIRE          -> { fireHeld = isPressed; if (isPressed) lmbJustPressed = true; }
             case VISION_TOGGLE -> { if (isPressed) visionTogglePending = true; }
             case PAUSE         -> { if (isPressed) pausePending         = true; }
+            case ESCAPE        -> { if (isPressed) escapePending        = true; }
             case RESTART       -> { if (isPressed) restartPending       = true; }
             case CYCLE_WEAPON  -> { if (isPressed) cycleWeaponPending   = true; }
+            case FIRE_LOCK     -> { if (isPressed) fireLockPending      = true; }
             case CHOICE_1      -> { if (isPressed) choicePending = 0; }
             case CHOICE_2      -> { if (isPressed) choicePending = 1; }
             case CHOICE_3      -> { if (isPressed) choicePending = 2; }
@@ -189,6 +199,11 @@ public class InputHandler implements ActionListener {
         return false;
     }
 
+    public boolean isEscapePressed() {
+        if (escapePending)  { escapePending  = false; return true; }
+        return false;
+    }
+
     public boolean isRestartPressed() {
         if (restartPending) { restartPending = false; return true; }
         return false;
@@ -196,6 +211,20 @@ public class InputHandler implements ActionListener {
 
     public boolean isCycleWeaponPressed() {
         if (cycleWeaponPending) { cycleWeaponPending = false; return true; }
+        return false;
+    }
+
+    public boolean isFireLockPressed() {
+        if (fireLockPending) { fireLockPending = false; return true; }
+        return false;
+    }
+
+    /**
+     * Returns {@code true} once when the left mouse button was just clicked
+     * this frame (one-shot, consumed on read). Used for menu interactions.
+     */
+    public boolean isLmbJustPressed() {
+        if (lmbJustPressed) { lmbJustPressed = false; return true; }
         return false;
     }
 

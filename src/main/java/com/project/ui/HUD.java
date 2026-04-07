@@ -47,6 +47,11 @@ public class HUD {
     private final BitmapText centerMessage;
     private final BitmapText subMessage;
 
+    // Pause menu buttons
+    private final BitmapText pauseResumeText;
+    private final BitmapText pauseRestartText;
+    private final BitmapText pauseQuitText;
+
     // Weapon select overlay
     private final BitmapText weaponSelectTitle;
     private final BitmapText weaponSelectOptions;
@@ -54,6 +59,7 @@ public class HUD {
 
     // Bottom hint
     private final BitmapText controlsHint;
+    private final BitmapText fireLockText;
 
     // ------------------------------------------------------------------
     // Constructor
@@ -76,15 +82,23 @@ public class HUD {
         centerMessage = makeText(font, guiNode, 3.0f, ColorRGBA.White);
         subMessage    = makeText(font, guiNode, 1.6f, ColorRGBA.LightGray);
 
+        pauseResumeText  = makeText(font, guiNode, 2.0f, new ColorRGBA(0.3f, 1.0f, 0.3f, 1f));
+        pauseRestartText = makeText(font, guiNode, 2.0f, new ColorRGBA(1.0f, 0.8f, 0.2f, 1f));
+        pauseQuitText    = makeText(font, guiNode, 2.0f, new ColorRGBA(1.0f, 0.3f, 0.3f, 1f));
+
         weaponSelectTitle   = makeText(font, guiNode, 2.2f,  new ColorRGBA(1f, 0.85f, 0.2f, 1f));
         weaponSelectOptions = makeText(font, guiNode, 1.4f,  ColorRGBA.White);
         weaponSelectNav     = makeText(font, guiNode, 1.2f,  new ColorRGBA(0.6f, 0.6f, 0.6f, 1f));
 
         controlsHint  = makeText(font, guiNode, 1.0f,
                 new ColorRGBA(0.55f, 0.55f, 0.55f, 1f));
+        fireLockText  = makeText(font, guiNode, 1.2f,
+                new ColorRGBA(1.0f, 0.6f, 0.0f, 1f));
 
-        controlsHint.setText("WASD: Move  |  LMB: Fire  |  Q/E: Cycle Weapon  |  P: Pause");
+        controlsHint.setText("WASD: Move  |  LMB/Q: Fire/Lock  |  E: Cycle Weapon  |  P/ESC: Pause");
         controlsHint.setLocalTranslation(10f, 28f, 0f);
+        fireLockText.setText("");
+        fireLockText.setLocalTranslation(10f, 50f, 0f);
 
         // Initial placeholder text for correct first-frame sizing
         heartsText.setText("♥♥♥");
@@ -96,6 +110,9 @@ public class HUD {
         blackHoleText.setText("");
         centerMessage.setText("");
         subMessage.setText("");
+        pauseResumeText.setText("");
+        pauseRestartText.setText("");
+        pauseQuitText.setText("");
         weaponSelectTitle.setText("");
         weaponSelectOptions.setText("");
         weaponSelectNav.setText("");
@@ -208,17 +225,54 @@ public class HUD {
     // ------------------------------------------------------------------
     // One-shot state methods
     // ------------------------------------------------------------------
-    /** Shows or hides the PAUSED overlay. */
+    /** Shows or hides the PAUSED overlay with clickable Resume / Restart / Quit buttons. */
     public void showPauseOverlay(boolean show) {
         if (show) {
             centerMessage.setColor(ColorRGBA.White);
             centerMessage.setText("PAUSED");
-            subMessage.setText("Press P to Resume");
+            subMessage.setText("P / ESC to Resume");
+            recenterMessage();
+
+            pauseResumeText.setText("[  RESUME  ]");
+            pauseRestartText.setText("[  RESTART  ]");
+            pauseQuitText.setText("[  QUIT  ]");
+            layoutPauseButtons();
+            pauseResumeText.setCullHint(com.jme3.scene.Spatial.CullHint.Never);
+            pauseRestartText.setCullHint(com.jme3.scene.Spatial.CullHint.Never);
+            pauseQuitText.setCullHint(com.jme3.scene.Spatial.CullHint.Never);
         } else {
             centerMessage.setText("");
             subMessage.setText("");
+            hidePauseButtons();
         }
-        recenterMessage();
+    }
+
+    /**
+     * Checks which pause-menu button (if any) the mouse cursor is over and
+     * returns an option index: 0 = Resume, 1 = Restart, 2 = Quit, -1 = none.
+     */
+    public int getPauseMenuClickedOption(float mx, float my) {
+        if (hitTest(pauseResumeText,  mx, my)) return 0;
+        if (hitTest(pauseRestartText, mx, my)) return 1;
+        if (hitTest(pauseQuitText,    mx, my)) return 2;
+        return -1;
+    }
+
+    /**
+     * Highlights pause-menu buttons on hover.  Call every frame while paused.
+     */
+    public void updatePauseMenuHover(float mx, float my) {
+        pauseResumeText.setColor(hitTest(pauseResumeText, mx, my)
+                ? ColorRGBA.White : new ColorRGBA(0.3f, 1.0f, 0.3f, 1f));
+        pauseRestartText.setColor(hitTest(pauseRestartText, mx, my)
+                ? ColorRGBA.White : new ColorRGBA(1.0f, 0.8f, 0.2f, 1f));
+        pauseQuitText.setColor(hitTest(pauseQuitText, mx, my)
+                ? ColorRGBA.White : new ColorRGBA(1.0f, 0.3f, 0.3f, 1f));
+    }
+
+    /** Shows or hides the fire-lock status indicator. */
+    public void setFireLockStatus(boolean locked) {
+        fireLockText.setText(locked ? "[Q] FIRE LOCKED" : "");
     }
 
     /** Shows the GAME OVER overlay. */
@@ -257,6 +311,8 @@ public class HUD {
         subMessage.setText("");
         centerMessage.setColor(ColorRGBA.White);
         blackHoleText.setText("");
+        fireLockText.setText("");
+        hidePauseButtons();
     }
 
     // ------------------------------------------------------------------
@@ -316,6 +372,38 @@ public class HUD {
                    - weaponSelectOptions.getSize() * 7f;
         float navX = Math.max(0f, (screenW - weaponSelectNav.getLineWidth()) * 0.5f);
         weaponSelectNav.setLocalTranslation(navX, navY, 0f);
+    }
+
+    private void layoutPauseButtons() {
+        float midY   = screenH * 0.45f;
+        float stepY  = pauseResumeText.getSize() * 2.2f;
+        centre(pauseResumeText,  midY);
+        centre(pauseRestartText, midY - stepY);
+        centre(pauseQuitText,    midY - stepY * 2f);
+    }
+
+    private void hidePauseButtons() {
+        pauseResumeText.setText("");
+        pauseRestartText.setText("");
+        pauseQuitText.setText("");
+        pauseResumeText.setCullHint(com.jme3.scene.Spatial.CullHint.Always);
+        pauseRestartText.setCullHint(com.jme3.scene.Spatial.CullHint.Always);
+        pauseQuitText.setCullHint(com.jme3.scene.Spatial.CullHint.Always);
+    }
+
+    /**
+     * Returns {@code true} when the point (mx, my) falls within the text's
+     * bounding rectangle (with a small padding).
+     */
+    private boolean hitTest(BitmapText text, float mx, float my) {
+        if (text.getText().isEmpty()) return false;
+        float x   = text.getLocalTranslation().x;
+        float y   = text.getLocalTranslation().y;
+        float w   = text.getLineWidth();
+        float h   = text.getSize() * 1.4f;
+        float pad = 8f;
+        return mx >= x - pad && mx <= x + w + pad
+            && my >= y - pad && my <= y + h + pad;
     }
 
     /** Heart symbols — filled ♥ for current HP, empty ♡ for lost. */

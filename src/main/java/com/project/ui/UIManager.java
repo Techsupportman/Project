@@ -59,6 +59,21 @@ public class UIManager {
         hud.showPauseOverlay(show);
     }
 
+    /** @see HUD#getPauseMenuClickedOption(float, float) */
+    public int getPauseMenuClickedOption(float mx, float my) {
+        return hud.getPauseMenuClickedOption(mx, my);
+    }
+
+    /** @see HUD#updatePauseMenuHover(float, float) */
+    public void updatePauseMenuHover(float mx, float my) {
+        hud.updatePauseMenuHover(mx, my);
+    }
+
+    /** @see HUD#setFireLockStatus(boolean) */
+    public void setFireLockStatus(boolean locked) {
+        hud.setFireLockStatus(locked);
+    }
+
     /** @see HUD#showGameOverOverlay(int) */
     public void showGameOverOverlay(int finalScore) {
         hud.showGameOverOverlay(finalScore);
@@ -126,6 +141,32 @@ public class UIManager {
     /** @return {@code true} when the level-up menu is currently displayed. */
     public boolean isLevelUpMenuVisible() {
         return levelUpMenu.isVisible();
+    }
+
+    /**
+     * Updates hover-highlighting on the level-up menu.
+     * Call every frame while LEVEL_UP state is active.
+     */
+    public void updateLevelUpHover(float mx, float my, int activeChoices) {
+        levelUpMenu.updateHover(mx, my, activeChoices);
+    }
+
+    /**
+     * Returns the 0-based index of the upgrade choice the cursor is over,
+     * or -1 if none.
+     */
+    public int getLevelUpClickedChoice(float mx, float my, int activeChoices) {
+        return levelUpMenu.getClickedChoice(mx, my, activeChoices);
+    }
+
+    /** Returns {@code true} when the cursor is over the Reroll button. */
+    public boolean isLevelUpRerollClicked(float mx, float my) {
+        return levelUpMenu.isRerollClicked(mx, my);
+    }
+
+    /** Returns {@code true} when the cursor is over the Delete/Skip button. */
+    public boolean isLevelUpDeleteClicked(float mx, float my) {
+        return levelUpMenu.isDeleteClicked(mx, my);
     }
 
     // ------------------------------------------------------------------

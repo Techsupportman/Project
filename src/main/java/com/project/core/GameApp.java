@@ -107,6 +107,7 @@ public class GameApp extends SimpleApplication {
     private GameState      gameState;
     private List<Upgrade>  currentUpgradeChoices;
     private final Random   random = new Random();
+    private boolean        fireLocked = false;
 
     // ------------------------------------------------------------------
     // Pocket Black Hole
@@ -129,15 +130,15 @@ public class GameApp extends SimpleApplication {
 
     /** Immutable data snapshot of a single fired projectile for black-hole replay. */
     private static final class ProjectileSnapshot {
-        final float dirX, dirZ;
+        /** Spread angle offset from the base aim direction (radians). */
+        final float spreadAngle;
         final float speed, damage, bulletSize;
         final int   pierce, ricochet;
 
-        ProjectileSnapshot(float dirX, float dirZ,
+        ProjectileSnapshot(float spreadAngle,
                            float speed, float damage, float bulletSize,
                            int pierce, int ricochet) {
-            this.dirX       = dirX;
-            this.dirZ       = dirZ;
+            this.spreadAngle = spreadAngle;
             this.speed      = speed;
             this.damage     = damage;
             this.bulletSize = bulletSize;
