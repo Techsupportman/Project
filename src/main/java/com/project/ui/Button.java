@@ -90,8 +90,8 @@ public class Button {
     }
 
     public void setHovered(boolean hovered) {
-        bgMat.setColor("Color", hovered ? COLOR_BG_HOVER.clone() : COLOR_BG_NORMAL.clone());
-        label.setColor(hovered ? COLOR_TEXT_HOVER.clone() : COLOR_TEXT_NORMAL.clone());
+        bgMat.setColor("Color", hovered ? COLOR_BG_HOVER : COLOR_BG_NORMAL);
+        label.setColor(hovered ? COLOR_TEXT_HOVER : COLOR_TEXT_NORMAL);
     }
 
     /** Returns {@code true} when (mx, my) is within the button bounds. */
