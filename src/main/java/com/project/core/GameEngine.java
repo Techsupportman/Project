@@ -1,31 +1,48 @@
 package com.project.core;
 
+import com.project.difficulty.Difficulty;
+import com.project.entities.EnemyType;
 import com.project.utils.Constants;
 
 /**
- * Encapsulates all high-level game-logic state: wave progression, score, and
- * player-death detection.
+ * Encapsulates high-level game-logic state: time, score, level, credits,
+ * and wave/spawn bookkeeping.
  *
- * <p>{@link GameApp} owns an instance of this class and calls
- * {@link #tick(float)} every frame while the game is in
- * {@link GameState#PLAYING}.  The return value signals to the app whether a
- * significant event has occurred that requires a scene-graph change (e.g.
- * spawning a new wave or triggering game-over).
+ * <h3>Changes from original MVP</h3>
+ * <ul>
+ *   <li>Score is scaled by the chosen {@link Difficulty#scoreMultiplier}.</li>
+ *   <li>Credits accumulate as {@code floor(score × 0.1)}.</li>
+ *   <li>Elapsed game-time is tracked so the HUD can display it and
+ *       {@link com.project.systems.SpawnManager} can schedule bosses.</li>
+ *   <li>The wave-based event system is retained for backward compatibility
+ *       with existing tests, but the main game now uses
+ *       {@link com.project.systems.SpawnManager} for actual spawning.</li>
+ * </ul>
  */
 public class GameEngine {
 
     // ------------------------------------------------------------------
-    // Wave state
+    // Difficulty
     // ------------------------------------------------------------------
-    private int   currentWave       = 0;
-    private int   enemiesAlive      = 0;
-    private float waveCountdown     = 0f;   // time remaining before next wave
-    private boolean waitingForWave  = true; // true = countdown running, false = wave active
+    private Difficulty difficulty = Difficulty.NORMAL;
 
     // ------------------------------------------------------------------
-    // Score
+    // Wave state (legacy — kept for backward compatibility)
     // ------------------------------------------------------------------
-    private int score = 0;
+    private int   currentWave       = 0;
+    private float waveCountdown     = 0f;
+    private boolean waitingForWave  = true;
+
+    // ------------------------------------------------------------------
+    // Score & Credits
+    // ------------------------------------------------------------------
+    private int   score   = 0;
+    private int   credits = 0;
+
+    // ------------------------------------------------------------------
+    // Time
+    // ------------------------------------------------------------------
+    private float elapsedSeconds = 0f;
 
     // ------------------------------------------------------------------
     // Events returned from tick()
@@ -46,10 +63,12 @@ public class GameEngine {
      * Advances the engine by one frame.
      *
      * @param tpf         seconds elapsed since last frame
-     * @param enemiesLeft number of currently active (alive) enemies in the scene
-     * @return an {@link Event} that the caller should act upon
+     * @param enemiesLeft number of currently active enemies in the scene
+     * @return an {@link Event} the caller should act upon
      */
     public Event tick(float tpf, int enemiesLeft) {
+        elapsedSeconds += tpf;
+
         if (waitingForWave) {
             waveCountdown -= tpf;
             if (waveCountdown <= 0f) {
@@ -58,7 +77,6 @@ public class GameEngine {
             }
         } else {
             if (enemiesLeft == 0 && currentWave > 0) {
-                // Wave has been cleared — begin countdown to next wave
                 waitingForWave = true;
                 waveCountdown  = Constants.WAVE_DELAY;
                 return Event.WAVE_CLEARED;
@@ -68,59 +86,64 @@ public class GameEngine {
     }
 
     // ------------------------------------------------------------------
-    // Wave management
+    // Wave management (legacy)
     // ------------------------------------------------------------------
-    /**
-     * Increments the wave counter.  Called by {@link GameApp} when
-     * {@link Event#START_NEXT_WAVE} is received.
-     */
-    public void advanceWave() {
-        currentWave++;
-    }
+    public void advanceWave() { currentWave++; }
 
-    /**
-     * Number of enemies to spawn for the upcoming wave.
-     * Scales linearly with wave number.
-     */
     public int enemiesForNextWave() {
         return Constants.BASE_ENEMIES_PER_WAVE
-                + (currentWave) * Constants.ENEMIES_INCREASE_PER_WAVE;
+                + currentWave * Constants.ENEMIES_INCREASE_PER_WAVE;
     }
 
-    /**
-     * Enemy movement speed for the upcoming wave.
-     * Increases slightly each wave to raise difficulty.
-     */
     public float speedForNextWave() {
         return Constants.ENEMY_SPEED_BASE
-                + (currentWave) * Constants.SPEED_INCREASE_PER_WAVE;
+                + currentWave * Constants.SPEED_INCREASE_PER_WAVE;
     }
 
     // ------------------------------------------------------------------
-    // Score
+    // Score & Credits
     // ------------------------------------------------------------------
-    /** Awards {@link Constants#ENEMY_SCORE_VALUE} points for a single kill. */
+    /**
+     * Records a kill, awarding score and credits based on the enemy type and
+     * the current difficulty multiplier.
+     *
+     * @param type enemy type killed
+     */
+    public void recordKill(EnemyType type) {
+        int raw = (int) (type.scoreValue * difficulty.scoreMultiplier);
+        score   += raw;
+        credits  = (int) (score * Constants.CREDITS_PER_SCORE);
+    }
+
+    /** Awards the legacy fixed score value (used by tests). */
     public void recordKill() {
-        score += Constants.ENEMY_SCORE_VALUE;
+        int raw = (int) (Constants.ENEMY_SCORE_VALUE * difficulty.scoreMultiplier);
+        score   += raw;
+        credits  = (int) (score * Constants.CREDITS_PER_SCORE);
     }
 
     // ------------------------------------------------------------------
     // Reset
     // ------------------------------------------------------------------
-    /** Resets all state back to the start-of-game values. */
     public void reset() {
         currentWave    = 0;
-        enemiesAlive   = 0;
         waveCountdown  = 0f;
         waitingForWave = true;
         score          = 0;
+        credits        = 0;
+        elapsedSeconds = 0f;
     }
 
     // ------------------------------------------------------------------
     // Accessors
     // ------------------------------------------------------------------
-    public int     getCurrentWave()    { return currentWave;    }
-    public int     getScore()          { return score;          }
-    public float   getWaveCountdown()  { return waveCountdown;  }
-    public boolean isWaitingForWave()  { return waitingForWave; }
+    public int        getCurrentWave()   { return currentWave;    }
+    public int        getScore()         { return score;          }
+    public int        getCredits()       { return credits;        }
+    public float      getWaveCountdown() { return waveCountdown;  }
+    public boolean    isWaitingForWave() { return waitingForWave; }
+    public float      getElapsedSeconds(){ return elapsedSeconds; }
+    public Difficulty getDifficulty()    { return difficulty;     }
+
+    public void setDifficulty(Difficulty d) { this.difficulty = d; }
 }

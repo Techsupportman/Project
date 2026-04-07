@@ -1,4 +1,4 @@
-# Project – Top-Down 2D Game
+# Project – Top-Down 2D Game (Disfigure-inspired)
 
 A top-down 2D action game inspired by [Disfigure](https://disfigure.wiki.gg/), built with
 [jMonkeyEngine](https://jmonkeyengine.org/) (3.6.1-stable / targeting 3.8).
@@ -10,29 +10,46 @@ A top-down 2D action game inspired by [Disfigure](https://disfigure.wiki.gg/), b
 ```
 src/main/java/com/project/
 ├── core/
-│   ├── Main.java          – Entry point; configures AppSettings and starts GameApp
-│   ├── GameApp.java       – jMonkey SimpleApplication; owns all systems and the game loop
-│   ├── GameEngine.java    – Pure-logic wave manager: wave progression, score, events
-│   └── GameState.java     – Enum: PLAYING | PAUSED | GAME_OVER
+│   ├── Main.java              – Entry point; configures AppSettings and starts GameApp
+│   ├── GameApp.java           – jMonkey SimpleApplication; owns all systems and the game loop
+│   ├── GameEngine.java        – Score, credits, time tracking, difficulty-scaled kills
+│   └── GameState.java         – Enum: DIFFICULTY_SELECT | PLAYING | PAUSED | LEVEL_UP | GAME_OVER
+├── difficulty/
+│   └── Difficulty.java        – Easy / Normal / Hard / Nightmare with per-tier stat multipliers
 ├── entities/
-│   ├── GameObject.java    – Abstract base: position, size, AABB collision, scene Node
-│   ├── Player.java        – Player character: health, movement, melee attack
-│   └── Enemy.java         – Enemy: health, speed, contact damage
+│   ├── GameObject.java        – Abstract base: position, size, AABB collision, scene Node
+│   ├── Player.java            – Heart HP, ranged weapon, aim direction, EXP/level, credits
+│   ├── Enemy.java             – Multiple EnemyType variants; vision-based visibility
+│   ├── EnemyType.java         – 8 standard + 2 mini-bosses + 5 bosses with unlock times
+│   ├── Projectile.java        – Bullet: direction, speed, pierce, ricochet
+│   └── Pickup.java            – Heart / EXP / Mutation collectible
+├── weapons/
+│   ├── WeaponType.java        – 18 weapon types (Pistol → Rocket) with stat definitions
+│   ├── WeaponStats.java       – Damage, fire rate, bullet speed/size, pierce, ricochet, pellets
+│   └── Weapon.java            – Active weapon state: unlock status, fire-rate cooldown
 ├── systems/
-│   ├── AISystem.java      – Enemy direct-pursuit pathfinding + separation
-│   ├── CombatSystem.java  – Player AoE attack & enemy contact damage
-│   └── PhysicsSystem.java – AABB overlap resolution for all entity pairs
+│   ├── AISystem.java          – Enemy direct-pursuit pathfinding + separation
+│   ├── CombatSystem.java      – Enemy contact damage (1 heart per hit)
+│   ├── PhysicsSystem.java     – AABB overlap resolution
+│   ├── ProjectileSystem.java  – Move bullets, test against enemies, apply pierce
+│   ├── SpawnManager.java      – Time-based continuous spawning: standard → mini-boss → boss
+│   └── VisionSystem.java      – Circle / Cone visibility per enemy and pickup
+├── upgrades/
+│   ├── Upgrade.java           – Single upgrade node (id, parent, branch, name, magnitude)
+│   ├── UpgradeTree.java       – 7-node tree with exclusive A/B branching
+│   └── UpgradeManager.java    – 5 trees, generate choices, apply, reroll, delete
 ├── ui/
-│   ├── HUD.java           – 2D health bar, wave count, score, overlay banners
-│   └── UIManager.java     – Thin facade over HUD (extensible for future screens)
+│   ├── HUD.java               – Hearts, level/EXP, credits, time, vision mode, score
+│   ├── UIManager.java         – Facade over HUD + LevelUpMenu
+│   └── LevelUpMenu.java       – Level-up overlay: 3-5 upgrade options, reroll, delete
 ├── levels/
-│   ├── Level.java         – Abstract base for all levels
-│   ├── LevelManager.java  – Load / unload / reload levels
-│   └── Level1.java        – The arena: dark floor, grid lines, boundary walls
+│   ├── Level.java             – Abstract base for all levels
+│   ├── LevelManager.java      – Load / unload / reload levels
+│   └── Level1.java            – The arena: dark floor, grid lines, boundary walls
 ├── utils/
-│   ├── Constants.java     – All tunable numbers in one place
-│   ├── InputHandler.java  – Keyboard state (held keys + one-shot action flags)
-│   └── Vector2D.java      – Lightweight XZ-plane vector maths
+│   ├── Constants.java         – All tunable numbers in one place
+│   ├── InputHandler.java      – Keyboard + mouse state (movement, fire, vision toggle, choices)
+│   └── Vector2D.java          – Lightweight XZ-plane vector maths
 └── assets/
     ├── PlaceholderGenerator.java – Labelled coloured boxes (replace with real art later)
     └── MaterialFactory.java      – Unshaded material helpers
@@ -44,31 +61,41 @@ src/main/java/com/project/
 
 | Feature | Details |
 |---|---|
-| **Top-down orthographic camera** | Positioned directly above the arena, parallel projection |
-| **Player movement** | WASD / arrow keys, normalised for diagonals, clamped to arena bounds |
-| **Melee attack** | SPACE – area-of-effect around the player; cooldown-gated |
-| **Enemy AI** | Direct pursuit + separation force to prevent pile-ups |
-| **Wave system** | Enemies spawn in waves along the arena edges; count and speed increase each wave |
-| **Collision detection** | AABB overlap resolution for player–enemy and enemy–enemy pairs |
-| **Health system** | Player and enemies each have health; HUD bar changes colour (green → red) |
-| **Pause / Resume** | P key toggles; game loop freezes cleanly |
-| **Game Over / Restart** | Player death shows overlay; R resets all state cleanly |
-| **Placeholder assets** | Every visual element is a coloured flat box with a text label indicating the real asset to substitute |
-| **Unit tests** | Pure-logic tests for `Vector2D` and `GameEngine` (13 tests, no display required) |
+| **Difficulty selection** | Easy (6 HP) / Normal (3 HP) / Hard / Nightmare — stat multipliers applied to all systems |
+| **Ranged combat** | Left-click to fire toward the mouse cursor; weapon auto-fires while held |
+| **18 Weapon types** | Pistol → Rocket; unlock with Credits; each has unique damage/fire rate/pierce/ricochet/spread |
+| **Vision modes** | **Circle** — reveals all nearby enemies in 360°; **Cone** — reveals a directional area farther away; toggle with **RMB** |
+| **Fog of darkness** | Enemies and EXP are invisible outside vision range (cull-hint based) |
+| **Continuous spawning** | Time-based spawn manager: faster spawns over time, new enemy types unlock at timed thresholds |
+| **8 standard enemy types** | Basic, Runner, Tank, Shooter, Swarm, Bruiser, Specter, Artillery |
+| **Mini-bosses** | Alpha / Beta mini-bosses spawn every ~90 seconds |
+| **5 Bosses** | Colossus → Oblivion — one every 5 real minutes; arena sealed during fight |
+| **Heart-based HP** | Integer hearts displayed on HUD (♥); 1 heart lost per contact hit |
+| **Pickups** | EXP orbs (auto-collected), Hearts, Mutations (boss drops) |
+| **EXP & Levelling** | Kill enemies to earn EXP; level up to choose upgrades |
+| **5 Upgrade trees** | Damage, Fire Rate, Vitality, Mobility, Piercing — 7 nodes each with exclusive A/B branches |
+| **Level-up menu** | 3–5 random options; one Reroll and one Delete available per level |
+| **Credits** | Accumulated as Score × 0.1; spend to unlock weapons |
+| **HUD** | Hearts, Lv/EXP bar, Credits, MM:SS timer, Vision indicator, Score |
+| **Pause / Resume** | P key |
+| **Game Over / Restart** | Returns to difficulty select on R |
+| **Unit tests** | 40 tests covering engine, vision, weapons, upgrades, difficulty, vector maths |
 
 ---
 
 ## 🎮 Controls
 
-| Key | Action |
+| Input | Action |
 |---|---|
-| W / ↑ | Move up |
-| S / ↓ | Move down |
-| A / ← | Move left |
-| D / → | Move right |
-| SPACE | Attack (melee AoE) |
+| W / A / S / D | Move |
+| **Left Mouse Button** (hold) | Fire active weapon toward cursor |
+| **Right Mouse Button** | Toggle Circle / Cone vision |
+| Q / E | Cycle to next unlocked weapon |
 | P | Pause / Resume |
 | R | Restart (when Game Over) |
+| 1 – 5 | Choose upgrade in level-up menu |
+| F | Reroll upgrade choices (once per level) |
+| G | Skip / Delete upgrade (once per level) |
 
 ---
 
@@ -78,8 +105,10 @@ All visuals are placeholder flat boxes with a BitmapText label.  To swap in real
 
 | Label on box | Where to replace | Suggested real asset |
 |---|---|---|
-| `PLAYER_SPRITE` | `Player.java` constructor | Player sprite sheet / model |
-| `ENEMY_SPRITE` | `Enemy.java` constructor | Enemy sprite sheet / model |
+| `PLAYER` | `Player.java` constructor | Player sprite sheet / model |
+| `BASIC`, `RUNNER`, etc. | `Enemy.java` `colorFor()` | Enemy sprite variants |
+| `BULLET` | `Projectile.java` constructor | Bullet sprites per weapon type |
+| `HEART`, `EXP`, `MUTATION` | `Pickup.java` constructor | Pickup sprites |
 | Floor / walls | `Level1.java` | Tile-map or environment model |
 
 ---
@@ -114,5 +143,8 @@ mvn test
   current dependency resolves to **3.6.1-stable**, the latest stable release
   at the time of writing.  Update `<jme.version>` in `pom.xml` once 3.8 is
   published to the JMonkeyEngine Maven repository.
-* All game constants (speed, health, wave sizes, etc.) live in
+* All game constants (speed, health, vision radii, spawn intervals, etc.) live in
   `com.project.utils.Constants` — edit that file to tune balance.
+* Weapon unlock costs and all 18 weapon stat definitions are in
+  `com.project.weapons.WeaponType`.
+
