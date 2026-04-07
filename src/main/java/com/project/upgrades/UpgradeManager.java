@@ -20,6 +20,7 @@ import java.util.Random;
  *   <li>Vitality — grants extra hearts</li>
  *   <li>Mobility — increases player movement speed</li>
  *   <li>Piercing — adds pierce / ricochet to bullets</li>
+ *   <li>Black Hole — unlocks the Pocket Black Hole replay ability</li>
  * </ol>
  */
 public class UpgradeManager {
@@ -41,6 +42,17 @@ public class UpgradeManager {
     private float speedMult     = 1.0f;
     private int   bonusPierce   = 0;
     private int   bonusRicochet = 0;
+
+    // ------------------------------------------------------------------
+    // Pocket Black Hole state
+    // ------------------------------------------------------------------
+    private boolean pocketBlackHoleEnabled = false;
+    /** Multiplier applied to the spew fire rate (higher = faster replay). */
+    private float   blackHoleSpewRateMult  = 1.0f;
+    /** Additional recording duration in seconds. */
+    private float   blackHoleExtraRecordTime = 0f;
+    /** Extra pierce added to replayed projectiles. */
+    private int     blackHoleExtraPierce   = 0;
 
     // ------------------------------------------------------------------
     // Constructor
@@ -116,6 +128,10 @@ public class UpgradeManager {
         bonusRicochet = 0;
         rerollsLeft   = 1;
         deletesLeft   = 1;
+        pocketBlackHoleEnabled  = false;
+        blackHoleSpewRateMult   = 1.0f;
+        blackHoleExtraRecordTime = 0f;
+        blackHoleExtraPierce    = 0;
         for (UpgradeTree tree : trees) {
             for (Upgrade u : tree.getAllUpgrades()) {
                 // Reset chosen state via reflection workaround isn't needed:
@@ -154,6 +170,12 @@ public class UpgradeManager {
                 if (u.branch == 2) bonusRicochet += (int) u.magnitude;
                 else               bonusPierce   += (int) u.magnitude;
             }
+            // Black Hole tree
+            case "Pocket Black Hole"     -> pocketBlackHoleEnabled   = true;
+            case "Black Hole Accelerate" -> blackHoleSpewRateMult    += u.magnitude;
+            case "Black Hole Extend"     -> blackHoleExtraRecordTime += u.magnitude;
+            case "Black Hole Overdrive"  -> blackHoleSpewRateMult    += u.magnitude;
+            case "Black Hole Depth"      -> blackHoleExtraPierce     += (int) u.magnitude;
             default -> { /* unknown upgrade — no-op */ }
         }
     }
@@ -219,6 +241,17 @@ public class UpgradeManager {
             new Upgrade(7, 3, 2, "Deep Pierce II", "Bounced bullets deal +15% dmg", 0.15f)
         )));
 
+        // --- Pocket Black Hole tree ---
+        result.add(new UpgradeTree("Black Hole", List.of(
+            new Upgrade(1, 0, 0, "Pocket Black Hole",     "Record 10s of shots & replay them!",    1f),
+            new Upgrade(2, 1, 1, "Black Hole Accelerate", "Replay fire rate +50%",                 0.50f),
+            new Upgrade(3, 1, 2, "Black Hole Extend",     "Record for +5 extra seconds",           5f),
+            new Upgrade(4, 2, 1, "Black Hole Overdrive",  "Replay fire rate +50% more",            0.50f),
+            new Upgrade(5, 2, 2, "Black Hole Depth",      "+1 pierce on replayed shots",           1f),
+            new Upgrade(6, 3, 2, "Black Hole Extend II",  "Record for +5 extra seconds",           5f),
+            new Upgrade(7, 3, 2, "Black Hole Surge",      "Replay fire rate +75% more",            0.75f)
+        )));
+
         return result;
     }
 
@@ -234,4 +267,16 @@ public class UpgradeManager {
     public int   getRerollsLeft()  { return rerollsLeft;   }
     public int   getDeletesLeft()  { return deletesLeft;   }
     public List<UpgradeTree> getTrees() { return trees; }
+
+    // ------------------------------------------------------------------
+    // Pocket Black Hole accessors
+    // ------------------------------------------------------------------
+    /** @return {@code true} once the Pocket Black Hole upgrade has been picked. */
+    public boolean hasPocketBlackHole()      { return pocketBlackHoleEnabled;  }
+    /** @return the total recording window (base 10s + any extensions). */
+    public float   getBlackHoleRecordTime()  { return 10f + blackHoleExtraRecordTime; }
+    /** @return multiplier applied to the replay spew rate (>1 = faster). */
+    public float   getBlackHoleSpewRateMult(){ return blackHoleSpewRateMult; }
+    /** @return bonus pierce added to each replayed projectile. */
+    public int     getBlackHoleExtraPierce() { return blackHoleExtraPierce;  }
 }

@@ -25,9 +25,9 @@ import com.project.utils.Constants;
 public class Level1 extends Level {
 
     // Colour palette
-    private static final ColorRGBA COLOR_FLOOR = new ColorRGBA(0.12f, 0.14f, 0.18f, 1f);
-    private static final ColorRGBA COLOR_WALL  = new ColorRGBA(0.30f, 0.32f, 0.40f, 1f);
-    private static final ColorRGBA COLOR_GRID  = new ColorRGBA(0.18f, 0.20f, 0.26f, 1f);
+    private static final ColorRGBA COLOR_FLOOR = new ColorRGBA(0.28f, 0.32f, 0.40f, 1f);
+    private static final ColorRGBA COLOR_WALL  = new ColorRGBA(0.55f, 0.58f, 0.70f, 1f);
+    private static final ColorRGBA COLOR_GRID  = new ColorRGBA(0.22f, 0.26f, 0.34f, 1f);
 
     public Level1(AssetManager assetManager, Node rootNode) {
         super(assetManager, rootNode);

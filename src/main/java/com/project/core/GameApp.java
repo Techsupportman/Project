@@ -19,15 +19,17 @@ import com.project.systems.CombatSystem;
 import com.project.systems.PhysicsSystem;
 import com.project.systems.ProjectileSystem;
 import com.project.systems.SpawnManager;
-import com.project.systems.VisionSystem;
 import com.project.ui.UIManager;
 import com.project.upgrades.Upgrade;
 import com.project.upgrades.UpgradeManager;
 import com.project.utils.Constants;
 import com.project.utils.InputHandler;
 import com.project.weapons.WeaponStats;
+import com.project.weapons.WeaponType;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
@@ -38,12 +40,13 @@ import java.util.Random;
  * <h3>Key mechanics (Disfigure-inspired)</h3>
  * <ul>
  *   <li>Ranged shooting aimed with the mouse cursor</li>
- *   <li>Circle / Cone vision toggled with the Right Mouse Button</li>
+ *   <li>Weapon selection before each game run</li>
  *   <li>Time-based continuous enemy spawning via {@link SpawnManager}</li>
  *   <li>Integer heart-based HP</li>
  *   <li>EXP pickups and level-up upgrade trees</li>
  *   <li>Boss encounters that seal the arena</li>
  *   <li>Difficulty selection at game start</li>
+ *   <li>Pocket Black Hole upgrade: records shots for 10s then replays them</li>
  * </ul>
  */
 public class GameApp extends SimpleApplication {
@@ -52,6 +55,17 @@ public class GameApp extends SimpleApplication {
     // Difficulty
     // ------------------------------------------------------------------
     private Difficulty difficulty = Difficulty.NORMAL;
+
+    // ------------------------------------------------------------------
+    // Weapon selection
+    // ------------------------------------------------------------------
+    private static final WeaponType[] ALL_WEAPONS    = WeaponType.values();
+    private static final int          WEAPONS_PER_PAGE = 5;
+    private static final int          TOTAL_PAGES      =
+            (ALL_WEAPONS.length + WEAPONS_PER_PAGE - 1) / WEAPONS_PER_PAGE;
+
+    private WeaponType selectedWeapon    = WeaponType.PISTOL;
+    private int        weaponSelectPage  = 0;
 
     // ------------------------------------------------------------------
     // Game entities
@@ -69,7 +83,6 @@ public class GameApp extends SimpleApplication {
     private PhysicsSystem    physicsSystem;
     private ProjectileSystem projectileSystem;
     private SpawnManager     spawnManager;
-    private VisionSystem     visionSystem;
     private UpgradeManager   upgradeManager;
 
     // ------------------------------------------------------------------
@@ -96,6 +109,44 @@ public class GameApp extends SimpleApplication {
     private final Random   random = new Random();
 
     // ------------------------------------------------------------------
+    // Pocket Black Hole
+    // ------------------------------------------------------------------
+    /** Base recording window in seconds. */
+    private static final float BLACK_HOLE_BASE_RECORD_DURATION = 10f;
+    /** Base interval between replayed shots (seconds). */
+    private static final float BLACK_HOLE_BASE_SPEW_INTERVAL   = 0.15f;
+
+    /** Whether the upgrade has been obtained this run. */
+    private boolean blackHoleActive   = false;
+    /** True while replaying the recorded stack; false while recording. */
+    private boolean blackHoleSpewing  = false;
+    /** Elapsed time in the current recording window. */
+    private float   blackHoleRecordTimer = 0f;
+    /** Countdown until the next replayed shot fires. */
+    private float   blackHoleSpewTimer   = 0f;
+    /** Stack of projectile snapshots accumulated during the recording window. */
+    private final ArrayDeque<ProjectileSnapshot> blackHoleStack = new ArrayDeque<>();
+
+    /** Immutable data snapshot of a single fired projectile for black-hole replay. */
+    private static final class ProjectileSnapshot {
+        final float dirX, dirZ;
+        final float speed, damage, bulletSize;
+        final int   pierce, ricochet;
+
+        ProjectileSnapshot(float dirX, float dirZ,
+                           float speed, float damage, float bulletSize,
+                           int pierce, int ricochet) {
+            this.dirX       = dirX;
+            this.dirZ       = dirZ;
+            this.speed      = speed;
+            this.damage     = damage;
+            this.bulletSize = bulletSize;
+            this.pierce     = pierce;
+            this.ricochet   = ricochet;
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Constructor
     // ------------------------------------------------------------------
     public GameApp() {
@@ -112,6 +163,9 @@ public class GameApp extends SimpleApplication {
         setupCamera();
         setupLighting();
 
+        // Set a dark but non-black background so the level floor is visible
+        viewPort.setBackgroundColor(new ColorRGBA(0.08f, 0.08f, 0.12f, 1f));
+
         // Containers
         enemies     = new ArrayList<>();
         projectiles = new ArrayList<>();
@@ -122,7 +176,6 @@ public class GameApp extends SimpleApplication {
         combatSystem     = new CombatSystem();
         physicsSystem    = new PhysicsSystem();
         projectileSystem = new ProjectileSystem();
-        visionSystem     = new VisionSystem();
         upgradeManager   = new UpgradeManager();
         gameEngine       = new GameEngine();
 
@@ -145,6 +198,7 @@ public class GameApp extends SimpleApplication {
     public void simpleUpdate(float tpf) {
         switch (gameState) {
             case DIFFICULTY_SELECT -> handleDifficultySelect();
+            case WEAPON_SELECT     -> handleWeaponSelect();
             case PLAYING           -> updatePlaying(tpf);
             case PAUSED            -> {
                 if (inputHandler.isPausePressed()) togglePause();
@@ -169,14 +223,58 @@ public class GameApp extends SimpleApplication {
             case 3  -> Difficulty.NIGHTMARE;
             default -> Difficulty.NORMAL;
         };
-        startNewGame();
+        uiManager.hideDifficultySelect();
+        enterWeaponSelect();
     }
 
+    // ------------------------------------------------------------------
+    // Weapon selection
+    // ------------------------------------------------------------------
+    private void enterWeaponSelect() {
+        weaponSelectPage = 0;
+        selectedWeapon   = WeaponType.PISTOL;
+        gameState = GameState.WEAPON_SELECT;
+        showCurrentWeaponPage();
+    }
+
+    private void handleWeaponSelect() {
+        // F = next page, G = prev page
+        if (inputHandler.isRerollPressed()) {
+            weaponSelectPage = (weaponSelectPage + 1) % TOTAL_PAGES;
+            showCurrentWeaponPage();
+            return;
+        }
+        if (inputHandler.isDeletePressed()) {
+            weaponSelectPage = (weaponSelectPage - 1 + TOTAL_PAGES) % TOTAL_PAGES;
+            showCurrentWeaponPage();
+            return;
+        }
+        // 1–5 select a weapon from the current page
+        int choice = inputHandler.consumeChoicePending();
+        if (choice < 0) return;
+        int idx = weaponSelectPage * WEAPONS_PER_PAGE + choice;
+        if (idx < ALL_WEAPONS.length) {
+            selectedWeapon = ALL_WEAPONS[idx];
+            uiManager.hideWeaponSelect();
+            startNewGame();
+        }
+    }
+
+    private void showCurrentWeaponPage() {
+        int start = weaponSelectPage * WEAPONS_PER_PAGE;
+        int end   = Math.min(start + WEAPONS_PER_PAGE, ALL_WEAPONS.length);
+        WeaponType[] page = Arrays.copyOfRange(ALL_WEAPONS, start, end);
+        uiManager.showWeaponSelect(page, weaponSelectPage, TOTAL_PAGES);
+    }
+
+    // ------------------------------------------------------------------
+    // Game start / new run
+    // ------------------------------------------------------------------
     private void startNewGame() {
         // Remove any lingering entities
-        for (Enemy e : enemies)       rootNode.detachChild(e.getNode());
-        for (Projectile p : projectiles) rootNode.detachChild(p.getNode());
-        for (Pickup pk : pickups)     rootNode.detachChild(pk.getNode());
+        for (Enemy e : enemies)           rootNode.detachChild(e.getNode());
+        for (Projectile p : projectiles)  rootNode.detachChild(p.getNode());
+        for (Pickup pk : pickups)         rootNode.detachChild(pk.getNode());
         enemies.clear();
         projectiles.clear();
         pickups.clear();
@@ -189,11 +287,18 @@ public class GameApp extends SimpleApplication {
         spawnManager = new SpawnManager(difficulty);
         upgradeManager.reset();
 
-        // Create fresh player
+        // Reset Pocket Black Hole state
+        blackHoleActive      = false;
+        blackHoleSpewing     = false;
+        blackHoleRecordTimer = 0f;
+        blackHoleSpewTimer   = 0f;
+        blackHoleStack.clear();
+
+        // Create fresh player and apply the chosen starting weapon
         player = new Player(assetManager, 0f, 0f, difficulty);
+        player.setStartingWeapon(selectedWeapon);
         rootNode.attachChild(player.getNode());
 
-        uiManager.hideDifficultySelect();
         uiManager.reset();
 
         gameState = GameState.PLAYING;
@@ -211,11 +316,6 @@ public class GameApp extends SimpleApplication {
         // --- Weapon cycling ---
         if (inputHandler.isCycleWeaponPressed()) {
             player.cycleWeapon();
-        }
-
-        // --- Vision toggle ---
-        if (inputHandler.isVisionTogglePressed()) {
-            player.toggleVisionMode();
         }
 
         // --- Player movement ---
@@ -248,7 +348,6 @@ public class GameApp extends SimpleApplication {
         }
 
         // --- Projectiles ---
-        List<Enemy> deadEnemies = new ArrayList<>();
         projectileSystem.update(projectiles, enemies, tpf);
 
         // --- Enemy spawning (time-based) ---
@@ -258,24 +357,6 @@ public class GameApp extends SimpleApplication {
             rootNode.attachChild(e.getNode());
             if (e.getEnemyType().isBoss) {
                 uiManager.showBossWarning(e.getEnemyType().displayName);
-            }
-        }
-
-        // --- Vision system ---
-        for (Enemy e : enemies) {
-            visionSystem.updateVisibility(e, player);
-        }
-        // EXP pickups also follow vision rules
-        for (Pickup pk : pickups) {
-            if (pk.getPickupType() == Pickup.PickupType.EXP) {
-                boolean vis = visionSystem.isVisible(
-                        pk.getPosition().x, pk.getPosition().z,
-                        player.getPosition().x, player.getPosition().z,
-                        player.getAimDirX(), player.getAimDirZ(),
-                        player.isCircleVision());
-                pk.getNode().setCullHint(vis
-                        ? com.jme3.scene.Spatial.CullHint.Never
-                        : com.jme3.scene.Spatial.CullHint.Always);
             }
         }
 
@@ -318,6 +399,12 @@ public class GameApp extends SimpleApplication {
             }
         }
 
+        // --- Pocket Black Hole ---
+        syncBlackHoleState();
+        if (blackHoleActive) {
+            updateBlackHole(tpf);
+        }
+
         // --- Game over check ---
         if (player.isDead()) {
             triggerGameOver();
@@ -333,8 +420,97 @@ public class GameApp extends SimpleApplication {
         // --- HUD ---
         uiManager.update(player, gameEngine.getScore(), gameState,
                 gameEngine.getWaveCountdown(), gameEngine.isWaitingForWave(), tpf);
-        uiManager.updateTimeAndVision(
-                spawnManager.getElapsedSeconds(), player.isCircleVision());
+        uiManager.updateTimeAndVision(spawnManager.getElapsedSeconds(), false);
+        updateBlackHoleHud();
+    }
+
+    // ------------------------------------------------------------------
+    // Pocket Black Hole logic
+    // ------------------------------------------------------------------
+
+    /**
+     * Activates the black hole if the upgrade has just been obtained and the
+     * system is not yet tracking anything.
+     */
+    private void syncBlackHoleState() {
+        if (!blackHoleActive && upgradeManager.hasPocketBlackHole()) {
+            blackHoleActive      = true;
+            blackHoleSpewing     = false;
+            blackHoleRecordTimer = 0f;
+            blackHoleStack.clear();
+        }
+    }
+
+    /**
+     * Advances the black hole state machine each frame.
+     * <ul>
+     *   <li>RECORDING: accumulates projectile snapshots for the configured window.
+     *       After the window closes, switches to SPEWING.</li>
+     *   <li>SPEWING: ejects one snapshot every {@link #BLACK_HOLE_BASE_SPEW_INTERVAL}
+     *       seconds from the player's current position.  When the stack empties,
+     *       switches back to RECORDING.</li>
+     * </ul>
+     */
+    private void updateBlackHole(float tpf) {
+        if (!blackHoleSpewing) {
+            // --- RECORDING phase ---
+            blackHoleRecordTimer += tpf;
+            float recordDuration = upgradeManager.getBlackHoleRecordTime();
+            if (blackHoleRecordTimer >= recordDuration) {
+                // Transition to spewing (even if stack is empty — just restart)
+                if (!blackHoleStack.isEmpty()) {
+                    blackHoleSpewing = true;
+                    blackHoleSpewTimer = 0f;
+                } else {
+                    // Nothing recorded yet; restart the window
+                    blackHoleRecordTimer = 0f;
+                }
+            }
+        } else {
+            // --- SPEWING phase ---
+            blackHoleSpewTimer -= tpf;
+            float spewInterval = BLACK_HOLE_BASE_SPEW_INTERVAL
+                    / upgradeManager.getBlackHoleSpewRateMult();
+            while (blackHoleSpewTimer <= 0f && !blackHoleStack.isEmpty()) {
+                ProjectileSnapshot snap = blackHoleStack.pollFirst();
+                // Fire the replayed projectile from the player's current position,
+                // applying any bonus pierce earned from Black Hole Depth upgrades.
+                int replayPierce = snap.pierce + upgradeManager.getBlackHoleExtraPierce();
+                Projectile proj = new Projectile(
+                        assetManager,
+                        player.getPosition().x, player.getPosition().z,
+                        snap.dirX, snap.dirZ,
+                        snap.speed, snap.damage, snap.bulletSize,
+                        replayPierce, snap.ricochet,
+                        Constants.LEVEL_HALF_WIDTH, Constants.LEVEL_HALF_HEIGHT
+                );
+                projectiles.add(proj);
+                rootNode.attachChild(proj.getNode());
+                blackHoleSpewTimer += spewInterval;
+            }
+            if (blackHoleStack.isEmpty()) {
+                // All replayed — back to recording
+                blackHoleSpewing     = false;
+                blackHoleRecordTimer = 0f;
+            }
+        }
+    }
+
+    /** Pushes the HUD black-hole status string each frame. */
+    private void updateBlackHoleHud() {
+        if (!blackHoleActive) {
+            uiManager.setBlackHoleStatus("");
+            return;
+        }
+        if (blackHoleSpewing) {
+            uiManager.setBlackHoleStatus(
+                    "O BLACK HOLE: SPEWING [" + blackHoleStack.size() + " left]");
+        } else {
+            float recordDuration = upgradeManager.getBlackHoleRecordTime();
+            uiManager.setBlackHoleStatus(String.format(
+                    "O BLACK HOLE: RECORDING [%.0f/%.0fs | %d shots]",
+                    blackHoleRecordTimer, recordDuration, blackHoleStack.size()));
+        }
     }
 
     // ------------------------------------------------------------------
@@ -389,6 +565,7 @@ public class GameApp extends SimpleApplication {
     /**
      * Spawns one or more projectiles from the player's current weapon position
      * toward the aim direction, applying spread for multi-pellet weapons.
+     * Also records a snapshot for the Pocket Black Hole if in recording mode.
      */
     private void spawnProjectiles() {
         WeaponStats stats  = player.getActiveWeapon().getStats();
@@ -428,6 +605,15 @@ public class GameApp extends SimpleApplication {
             );
             projectiles.add(proj);
             rootNode.attachChild(proj.getNode());
+
+            // Record snapshot for Pocket Black Hole (recording phase only)
+            if (blackHoleActive && !blackHoleSpewing) {
+                blackHoleStack.add(new ProjectileSnapshot(
+                        ax, az,
+                        stats.bulletSpeed, finalDamage, stats.bulletSize,
+                        finalPierce, finalRicochet
+                ));
+            }
         }
     }
 
@@ -492,7 +678,6 @@ public class GameApp extends SimpleApplication {
      * the orthographic camera, returning [worldX, worldZ].
      */
     private float[] screenToWorld(float screenX, float screenY) {
-        // In an orthographic top-down setup the projection is linear.
         float aspect    = (float) cam.getWidth() / cam.getHeight();
         float viewHalfH = Constants.LEVEL_HALF_HEIGHT + 1.5f;
         float viewHalfW = viewHalfH * aspect;
@@ -520,9 +705,10 @@ public class GameApp extends SimpleApplication {
     }
 
     private void setupLighting() {
-        // Dim ambient light to suggest darkness outside vision range
+        // Full-brightness ambient light — all materials are Unshaded, so this
+        // is kept only for forward-compatibility with any future lit materials.
         AmbientLight ambient = new AmbientLight();
-        ambient.setColor(new ColorRGBA(0.4f, 0.4f, 0.45f, 1f));
+        ambient.setColor(ColorRGBA.White);
         rootNode.addLight(ambient);
     }
 }

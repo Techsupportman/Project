@@ -8,6 +8,8 @@ import com.jme3.scene.Node;
 import com.jme3.system.AppSettings;
 import com.project.core.GameState;
 import com.project.entities.Player;
+import com.project.weapons.WeaponStats;
+import com.project.weapons.WeaponType;
 
 /**
  * Heads-Up Display rendered in 2-D screen space (attached to
@@ -19,8 +21,8 @@ import com.project.entities.Player;
  *   <li><b>Level / EXP bar</b> — below hearts</li>
  *   <li><b>Credits</b> — below level</li>
  *   <li><b>Time elapsed</b> — top-right</li>
- *   <li><b>Vision mode indicator</b> — below time (Circle / Cone)</li>
- *   <li><b>Score</b> — below vision mode</li>
+ *   <li><b>Score</b> — below time</li>
+ *   <li><b>Black Hole status</b> — below score (when active)</li>
  *   <li><b>Centre message</b> — used for PAUSED, GAME OVER banners</li>
  *   <li><b>Controls hint</b> — bottom of screen</li>
  * </ul>
@@ -38,12 +40,17 @@ public class HUD {
 
     // Right-side HUD
     private final BitmapText timeText;
-    private final BitmapText visionText;
     private final BitmapText scoreText;
+    private final BitmapText blackHoleText;
 
     // Centre overlays
     private final BitmapText centerMessage;
     private final BitmapText subMessage;
+
+    // Weapon select overlay
+    private final BitmapText weaponSelectTitle;
+    private final BitmapText weaponSelectOptions;
+    private final BitmapText weaponSelectNav;
 
     // Bottom hint
     private final BitmapText controlsHint;
@@ -62,17 +69,21 @@ public class HUD {
         expText      = makeText(font, guiNode, 1.2f,  new ColorRGBA(0.4f, 1f, 0.5f, 1f));
         creditsText  = makeText(font, guiNode, 1.2f,  new ColorRGBA(1f, 0.9f, 0.2f, 1f));
 
-        timeText     = makeText(font, guiNode, 1.4f,  ColorRGBA.White);
-        visionText   = makeText(font, guiNode, 1.3f,  new ColorRGBA(0.5f, 0.9f, 1f, 1f));
-        scoreText    = makeText(font, guiNode, 1.3f,  ColorRGBA.White);
+        timeText      = makeText(font, guiNode, 1.4f,  ColorRGBA.White);
+        scoreText     = makeText(font, guiNode, 1.3f,  ColorRGBA.White);
+        blackHoleText = makeText(font, guiNode, 1.2f,  new ColorRGBA(0.4f, 0.0f, 1.0f, 1f));
 
         centerMessage = makeText(font, guiNode, 3.0f, ColorRGBA.White);
         subMessage    = makeText(font, guiNode, 1.6f, ColorRGBA.LightGray);
 
+        weaponSelectTitle   = makeText(font, guiNode, 2.2f,  new ColorRGBA(1f, 0.85f, 0.2f, 1f));
+        weaponSelectOptions = makeText(font, guiNode, 1.4f,  ColorRGBA.White);
+        weaponSelectNav     = makeText(font, guiNode, 1.2f,  new ColorRGBA(0.6f, 0.6f, 0.6f, 1f));
+
         controlsHint  = makeText(font, guiNode, 1.0f,
                 new ColorRGBA(0.55f, 0.55f, 0.55f, 1f));
 
-        controlsHint.setText("WASD: Move  |  LMB: Fire  |  RMB: Vision  |  Q/E: Weapon  |  P: Pause");
+        controlsHint.setText("WASD: Move  |  LMB: Fire  |  Q/E: Cycle Weapon  |  P: Pause");
         controlsHint.setLocalTranslation(10f, 28f, 0f);
 
         // Initial placeholder text for correct first-frame sizing
@@ -81,10 +92,13 @@ public class HUD {
         expText.setText("EXP: 0 / 100");
         creditsText.setText("Credits: 0");
         timeText.setText("00:00");
-        visionText.setText("Vision: Circle");
         scoreText.setText("Score: 0");
+        blackHoleText.setText("");
         centerMessage.setText("");
         subMessage.setText("");
+        weaponSelectTitle.setText("");
+        weaponSelectOptions.setText("");
+        weaponSelectNav.setText("");
 
         layoutStaticElements();
     }
@@ -124,19 +138,71 @@ public class HUD {
         layoutRightColumn();
     }
 
-    /** Refreshes time and vision-mode indicators (call each frame). */
-    public void updateTimeAndVision(float elapsedSeconds, boolean circleVision) {
+    /** Refreshes the elapsed-time indicator (call each frame). */
+    public void updateElapsedTime(float elapsedSeconds) {
         int totalSec = (int) elapsedSeconds;
         int minutes  = totalSec / 60;
         int seconds  = totalSec % 60;
         timeText.setText(String.format("%02d:%02d", minutes, seconds));
-
-        visionText.setText("Vision: " + (circleVision ? "◎ Circle" : "▷ Cone"));
-        visionText.setColor(circleVision
-                ? new ColorRGBA(0.4f, 1f, 1f, 1f)
-                : new ColorRGBA(1f, 0.7f, 0.3f, 1f));
-
         layoutRightColumn();
+    }
+
+    /**
+     * Legacy method kept for backward compatibility — updates only the time.
+     * The {@code circleVision} parameter is ignored; the vision system has been removed.
+     */
+    public void updateTimeAndVision(float elapsedSeconds, boolean circleVision) {
+        updateElapsedTime(elapsedSeconds);
+    }
+
+    /**
+     * Updates the Pocket Black Hole status indicator.
+     *
+     * @param statusText the text to display, or empty string to hide it
+     */
+    public void setBlackHoleStatus(String statusText) {
+        blackHoleText.setText(statusText);
+        layoutRightColumn();
+    }
+
+    // ------------------------------------------------------------------
+    // Weapon select overlay
+    // ------------------------------------------------------------------
+
+    /**
+     * Shows the weapon selection overlay for the given page of weapons.
+     *
+     * @param pageWeapons  weapons on this page (up to 5)
+     * @param page         0-based current page index
+     * @param totalPages   total number of pages
+     */
+    public void showWeaponSelect(WeaponType[] pageWeapons, int page, int totalPages) {
+        weaponSelectTitle.setText("SELECT YOUR STARTING WEAPON  (Page " + (page + 1) + " / " + totalPages + ")");
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < pageWeapons.length; i++) {
+            WeaponType wt = pageWeapons[i];
+            WeaponStats s = wt.stats;
+            sb.append(String.format("[%d] %-22s  DMG: %-6.0f  RATE: %-5.1f  SPD: %.0f",
+                    i + 1, wt.displayName, s.damage, s.fireRate, s.bulletSpeed));
+            if (s.pelletsPerShot > 1) {
+                sb.append(String.format("  x%d pellets", s.pelletsPerShot));
+            }
+            if (s.pierce > 0) {
+                sb.append(String.format("  pierce:%d", s.pierce));
+            }
+            sb.append("\n");
+        }
+        weaponSelectOptions.setText(sb.toString());
+        weaponSelectNav.setText("[F] Next Page   [G] Prev Page");
+        recenterWeaponSelect();
+    }
+
+    /** Hides the weapon selection overlay. */
+    public void hideWeaponSelect() {
+        weaponSelectTitle.setText("");
+        weaponSelectOptions.setText("");
+        weaponSelectNav.setText("");
     }
 
     // ------------------------------------------------------------------
@@ -180,7 +246,7 @@ public class HUD {
     /** Shows a boss-warning banner. */
     public void showBossWarning(String bossName) {
         centerMessage.setColor(new ColorRGBA(1f, 0.2f, 0.2f, 1f));
-        centerMessage.setText("⚠ BOSS — " + bossName + " ⚠");
+        centerMessage.setText("!! BOSS -- " + bossName + " !!");
         subMessage.setText("Defeat the boss to resume normal spawning!");
         recenterMessage();
     }
@@ -190,6 +256,7 @@ public class HUD {
         centerMessage.setText("");
         subMessage.setText("");
         centerMessage.setColor(ColorRGBA.White);
+        blackHoleText.setText("");
     }
 
     // ------------------------------------------------------------------
@@ -221,11 +288,11 @@ public class HUD {
         float tW = timeText.getLineWidth();
         timeText.setLocalTranslation(screenW - tW - 12f, startY, 0f);
 
-        float vW = visionText.getLineWidth();
-        visionText.setLocalTranslation(screenW - vW - 12f, startY - lineH, 0f);
-
         float sW = scoreText.getLineWidth();
-        scoreText.setLocalTranslation(screenW - sW - 12f, startY - lineH * 2f, 0f);
+        scoreText.setLocalTranslation(screenW - sW - 12f, startY - lineH, 0f);
+
+        float bW = blackHoleText.getLineWidth();
+        blackHoleText.setLocalTranslation(screenW - bW - 12f, startY - lineH * 2f, 0f);
     }
 
     private void recenterMessage() {
@@ -238,6 +305,17 @@ public class HUD {
         } else {
             subMessage.setLocalTranslation(0f, 0f, 0f);
         }
+    }
+
+    private void recenterWeaponSelect() {
+        float titleX = Math.max(0f, (screenW - weaponSelectTitle.getLineWidth()) * 0.5f);
+        float titleY = screenH * 0.85f;
+        weaponSelectTitle.setLocalTranslation(titleX, titleY, 0f);
+        weaponSelectOptions.setLocalTranslation(40f, titleY - weaponSelectTitle.getSize() * 2f, 0f);
+        float navY = titleY - weaponSelectTitle.getSize() * 2f
+                   - weaponSelectOptions.getSize() * 7f;
+        float navX = Math.max(0f, (screenW - weaponSelectNav.getLineWidth()) * 0.5f);
+        weaponSelectNav.setLocalTranslation(navX, navY, 0f);
     }
 
     /** Heart symbols — filled ♥ for current HP, empty ♡ for lost. */

@@ -70,10 +70,6 @@ public class Enemy extends GameObject {
         if (attackCooldown > 0f) {
             attackCooldown -= tpf;
         }
-        // Sync node visibility with vision system result
-        node.setCullHint(visibleToPlayer
-                ? com.jme3.scene.Spatial.CullHint.Never
-                : com.jme3.scene.Spatial.CullHint.Always);
     }
 
     // ------------------------------------------------------------------
