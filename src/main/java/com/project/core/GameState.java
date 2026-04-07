@@ -25,6 +25,9 @@ public enum GameState {
     /** The game is frozen; no entity updates occur.  Press P to resume. */
     PAUSED,
 
+    /** Settings menu is open (accessed from pause menu). */
+    SETTINGS,
+
     /** Player levelled up — upgrade choice menu is displayed. */
     LEVEL_UP,
 
