@@ -6,6 +6,7 @@ import com.jme3.system.AppSettings;
 import com.project.core.GameState;
 import com.project.entities.Player;
 import com.project.upgrades.Upgrade;
+import com.project.weapons.WeaponType;
 
 import java.util.List;
 
@@ -43,8 +44,14 @@ public class UIManager {
         hud.update(player, wave, score, state, waveTimer, waitingForWave, tpf);
     }
 
+    /** Updates the elapsed-time display. Ignores the circleVision param (vision system removed). */
     public void updateTimeAndVision(float elapsedSeconds, boolean circleVision) {
-        hud.updateTimeAndVision(elapsedSeconds, circleVision);
+        hud.updateElapsedTime(elapsedSeconds);
+    }
+
+    /** @see HUD#setBlackHoleStatus(String) */
+    public void setBlackHoleStatus(String statusText) {
+        hud.setBlackHoleStatus(statusText);
     }
 
     /** @see HUD#showPauseOverlay(boolean) */
@@ -70,6 +77,22 @@ public class UIManager {
     /** @see HUD#showBossWarning(String) */
     public void showBossWarning(String bossName) {
         hud.showBossWarning(bossName);
+    }
+
+    /**
+     * Shows the weapon selection overlay for a specific page of weapons.
+     *
+     * @param pageWeapons weapons displayed on this page (up to 5)
+     * @param page        0-based page index
+     * @param totalPages  total number of pages
+     */
+    public void showWeaponSelect(WeaponType[] pageWeapons, int page, int totalPages) {
+        hud.showWeaponSelect(pageWeapons, page, totalPages);
+    }
+
+    /** Hides the weapon selection overlay. */
+    public void hideWeaponSelect() {
+        hud.hideWeaponSelect();
     }
 
     /** @see HUD#reset() */

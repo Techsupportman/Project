@@ -154,6 +154,22 @@ public class Player extends GameObject {
     }
 
     /**
+     * Sets the player's starting weapon.  The specified weapon type is
+     * unlocked and made the active weapon regardless of credits.
+     *
+     * @param type the weapon type to start with
+     */
+    public void setStartingWeapon(WeaponType type) {
+        for (int i = 0; i < weapons.size(); i++) {
+            if (weapons.get(i).getType() == type) {
+                weapons.get(i).unlock();
+                activeWeaponIndex = i;
+                return;
+            }
+        }
+    }
+
+    /**
      * Cycles to the next unlocked weapon in the list.
      */
     public void cycleWeapon() {

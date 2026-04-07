@@ -5,7 +5,7 @@ package com.project.core;
  *
  * <p>State transitions:
  * <pre>
- *   DIFFICULTY_SELECT ──choice──► PLAYING
+ *   DIFFICULTY_SELECT ──choice──► WEAPON_SELECT ──choice──► PLAYING
  *   PLAYING ──P key──► PAUSED ──P key──► PLAYING
  *   PLAYING ──player dies──► GAME_OVER ──R key──► DIFFICULTY_SELECT
  *   PLAYING ──level up──► LEVEL_UP ──choice──► PLAYING
@@ -15,6 +15,9 @@ package com.project.core;
 public enum GameState {
     /** Shown at start/after game-over — player picks a difficulty tier. */
     DIFFICULTY_SELECT,
+
+    /** Shown after difficulty selection — player picks their starting weapon. */
+    WEAPON_SELECT,
 
     /** The game is actively running: enemies move, input is read, HUD updates. */
     PLAYING,
