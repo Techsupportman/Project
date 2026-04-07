@@ -1,7 +1,7 @@
 # Project – Top-Down 2D Game (Disfigure-inspired)
 
 A top-down 2D action game inspired by [Disfigure](https://disfigure.wiki.gg/), built with
-[jMonkeyEngine](https://jmonkeyengine.org/) (3.6.1-stable / targeting 3.8).
+[jMonkeyEngine 3.8.1-stable](https://github.com/jMonkeyEngine/jmonkeyengine/releases/tag/v3.8.1-stable).
 
 ---
 
@@ -139,10 +139,11 @@ mvn test
 
 ## 📝 Notes
 
-* The project targets jMonkeyEngine **3.8** (declared in `pom.xml`).  The
-  current dependency resolves to **3.6.1-stable**, the latest stable release
-  at the time of writing.  Update `<jme.version>` in `pom.xml` once 3.8 is
-  published to the JMonkeyEngine Maven repository.
+* The project uses jMonkeyEngine **3.8.1-stable** (see `pom.xml`).
+  Dependencies are resolved from Maven Central.  To open in the
+  [jMonkeyEngine SDK](https://github.com/jMonkeyEngine/sdk/releases), open
+  the project as a *Maven project* — the `nbactions.xml` file provides the
+  Run / Debug / Test action bindings required by the SDK.
 * All game constants (speed, health, vision radii, spawn intervals, etc.) live in
   `com.project.utils.Constants` — edit that file to tune balance.
 * Weapon unlock costs and all 18 weapon stat definitions are in
