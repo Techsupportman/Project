@@ -17,8 +17,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- Latest stable jMonkeyEngine release (3.8 target; using 3.6.1-stable) -->
-        <jme.version>3.6.1-stable</jme.version>
+        <jme.version>3.8.1-stable</jme.version>
     </properties>
 
     <repositories>

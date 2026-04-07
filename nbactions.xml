@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    NetBeans / jMonkeyEngine SDK action mappings.
+    These entries bind the standard IDE actions (Run, Debug, Clean+Build, Test)
+    to the correct Maven goals so the project works seamlessly when opened in
+    the jMonkeyEngine 3.8.1 SDK.
+-->
+<actions>
+
+    <!-- Run Project (Shift+F6 / green play button) -->
+    <action>
+        <actionName>run</actionName>
+        <goals>
+            <goal>compile</goal>
+            <goal>exec:java</goal>
+        </goals>
+        <properties>
+            <exec.mainClass>com.project.core.Main</exec.mainClass>
+        </properties>
+    </action>
+
+    <!-- Debug Project (Ctrl+F5 / debug button) -->
+    <action>
+        <actionName>debug</actionName>
+        <goals>
+            <goal>compile</goal>
+            <goal>exec:exec</goal>
+        </goals>
+        <properties>
+            <exec.executable>java</exec.executable>
+            <exec.args>-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address} -classpath %classpath com.project.core.Main</exec.args>
+            <jpda.listen>true</jpda.listen>
+        </properties>
+    </action>
+
+    <!-- Clean and Build (Shift+F11) -->
+    <action>
+        <actionName>clean</actionName>
+        <goals>
+            <goal>clean</goal>
+        </goals>
+    </action>
+
+    <!-- Build -->
+    <action>
+        <actionName>build</actionName>
+        <goals>
+            <goal>compile</goal>
+        </goals>
+    </action>
+
+    <!-- Test Project (Alt+F6) -->
+    <action>
+        <actionName>test</actionName>
+        <goals>
+            <goal>test</goal>
+        </goals>
+    </action>
+
+    <!-- Clean and Build with fat JAR -->
+    <action>
+        <actionName>rebuild</actionName>
+        <goals>
+            <goal>clean</goal>
+            <goal>package</goal>
+        </goals>
+    </action>
+
+</actions>
