@@ -13,7 +13,7 @@ public final class Constants {
     // -------------------------------------------------------------------------
     public static final int    WINDOW_WIDTH    = 1280;
     public static final int    WINDOW_HEIGHT   = 720;
-    public static final String GAME_TITLE      = "Project - Top Down 2D Game";
+    public static final String GAME_TITLE      = "Project — Disfigure-inspired";
     public static final int    TARGET_FPS      = 60;
 
     // -------------------------------------------------------------------------
@@ -25,13 +25,14 @@ public final class Constants {
     // -------------------------------------------------------------------------
     // Level bounds (half-extents in world units)
     // -------------------------------------------------------------------------
-    public static final float LEVEL_HALF_WIDTH  = 16f;
-    public static final float LEVEL_HALF_HEIGHT = 10f;
+    public static final float LEVEL_HALF_WIDTH  = 20f;
+    public static final float LEVEL_HALF_HEIGHT = 12f;
 
     // -------------------------------------------------------------------------
     // Player
     // -------------------------------------------------------------------------
     public static final float PLAYER_SPEED          = 8f;
+    /** Legacy float health kept for HUD backward compatibility. */
     public static final float PLAYER_MAX_HEALTH     = 100f;
     public static final float PLAYER_ATTACK_RANGE   = 2.8f;
     public static final float PLAYER_ATTACK_DAMAGE  = 25f;
@@ -43,19 +44,58 @@ public final class Constants {
     // Enemy
     // -------------------------------------------------------------------------
     public static final float ENEMY_SPEED_BASE            = 2.5f;
-    public static final float ENEMY_MAX_HEALTH            = 50f;
+    public static final float ENEMY_MAX_HEALTH            = 30f;
     public static final float ENEMY_CONTACT_RANGE         = 0.9f;
-    public static final float ENEMY_ATTACK_DAMAGE         = 10f;
+    public static final float ENEMY_ATTACK_DAMAGE         = 1f;  // 1 heart
     public static final float ENEMY_ATTACK_COOLDOWN       = 1.0f;
-    /** Collision half-extent (square AABB). */
+    /** Collision half-extent for standard enemies. */
     public static final float ENEMY_SIZE                  = 0.45f;
+    /** Collision half-extent for mini-bosses. */
+    public static final float MINI_BOSS_SIZE              = 0.75f;
+    /** Collision half-extent for full bosses. */
+    public static final float BOSS_SIZE                   = 1.20f;
     public static final int   ENEMY_SCORE_VALUE           = 10;
 
     // -------------------------------------------------------------------------
-    // Wave / Spawning
+    // Wave / Spawning (time-based continuous system)
     // -------------------------------------------------------------------------
+    /** Legacy wave delay kept for test compatibility. */
     public static final float WAVE_DELAY                = 3f;
+    /** Legacy enemies-per-wave kept for test compatibility. */
     public static final int   BASE_ENEMIES_PER_WAVE     = 3;
     public static final int   ENEMIES_INCREASE_PER_WAVE = 2;
     public static final float SPEED_INCREASE_PER_WAVE   = 0.25f;
+
+    /** Starting interval between enemy spawns (seconds). */
+    public static final float SPAWN_INTERVAL_INITIAL    = 3.0f;
+    /** Minimum spawn interval after full ramp-up. */
+    public static final float SPAWN_INTERVAL_MIN        = 0.4f;
+    /** Seconds over which the spawn rate ramps from initial to min. */
+    public static final float SPAWN_RAMP_DURATION       = 600f;  // 10 minutes
+    /** Maximum enemies on screen at once. */
+    public static final int   MAX_ENEMIES_ALIVE         = 80;
+
+    // -------------------------------------------------------------------------
+    // Vision system
+    // -------------------------------------------------------------------------
+    /** Radius (world units) for circle vision mode. */
+    public static final float VISION_CIRCLE_RADIUS   = 7.0f;
+    /** Range (world units) for cone vision mode. */
+    public static final float VISION_CONE_RANGE      = 12.0f;
+    /** Half-angle (radians) of the cone in cone vision mode (~50°). */
+    public static final float VISION_CONE_HALF_ANGLE = (float) Math.toRadians(50.0);
+    /** Near-radius always revealed in cone mode (so player isn't blind beside them). */
+    public static final float VISION_CONE_NEAR_RADIUS = 3.5f;
+
+    // -------------------------------------------------------------------------
+    // EXP & Levelling
+    // -------------------------------------------------------------------------
+    /** Base EXP required to reach level 2 (each level costs 10% more). */
+    public static final int EXP_PER_LEVEL = 100;
+
+    // -------------------------------------------------------------------------
+    // Scoring & Credits
+    // -------------------------------------------------------------------------
+    /** Credits = floor(score × CREDITS_PER_SCORE). */
+    public static final float CREDITS_PER_SCORE = 0.1f;
 }

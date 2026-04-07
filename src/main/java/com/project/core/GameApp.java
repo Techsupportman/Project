@@ -3,19 +3,29 @@ package com.project.core;
 import com.jme3.app.SimpleApplication;
 import com.jme3.light.AmbientLight;
 import com.jme3.math.ColorRGBA;
+import com.jme3.math.Vector2f;
 import com.jme3.math.Vector3f;
-import com.jme3.renderer.queue.RenderQueue;
 import com.jme3.scene.Node;
+import com.project.difficulty.Difficulty;
 import com.project.entities.Enemy;
+import com.project.entities.EnemyType;
+import com.project.entities.Pickup;
 import com.project.entities.Player;
+import com.project.entities.Projectile;
 import com.project.levels.Level1;
 import com.project.levels.LevelManager;
 import com.project.systems.AISystem;
 import com.project.systems.CombatSystem;
 import com.project.systems.PhysicsSystem;
+import com.project.systems.ProjectileSystem;
+import com.project.systems.SpawnManager;
+import com.project.systems.VisionSystem;
 import com.project.ui.UIManager;
+import com.project.upgrades.Upgrade;
+import com.project.upgrades.UpgradeManager;
 import com.project.utils.Constants;
 import com.project.utils.InputHandler;
+import com.project.weapons.WeaponStats;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -23,35 +33,44 @@ import java.util.List;
 import java.util.Random;
 
 /**
- * Main jMonkeyEngine application.  Extends {@link SimpleApplication} and acts
- * as the top-level coordinator for all game systems.
+ * Main jMonkeyEngine application — top-level coordinator for all game systems.
  *
- * <h3>Responsibilities</h3>
+ * <h3>Key mechanics (Disfigure-inspired)</h3>
  * <ul>
- *   <li>Camera setup (top-down orthographic)</li>
- *   <li>Scene graph initialisation (level, player, enemies)</li>
- *   <li>Forwarding per-frame updates to each system</li>
- *   <li>Game-state transitions (PLAYING ↔ PAUSED, PLAYING → GAME OVER)</li>
- *   <li>Wave spawning</li>
+ *   <li>Ranged shooting aimed with the mouse cursor</li>
+ *   <li>Circle / Cone vision toggled with the Right Mouse Button</li>
+ *   <li>Time-based continuous enemy spawning via {@link SpawnManager}</li>
+ *   <li>Integer heart-based HP</li>
+ *   <li>EXP pickups and level-up upgrade trees</li>
+ *   <li>Boss encounters that seal the arena</li>
+ *   <li>Difficulty selection at game start</li>
  * </ul>
- *
- * <p>Heavy game-logic (wave counters, score) is delegated to
- * {@link GameEngine}.
  */
 public class GameApp extends SimpleApplication {
 
     // ------------------------------------------------------------------
+    // Difficulty
+    // ------------------------------------------------------------------
+    private Difficulty difficulty = Difficulty.NORMAL;
+
+    // ------------------------------------------------------------------
     // Game entities
     // ------------------------------------------------------------------
-    private Player       player;
-    private List<Enemy>  enemies;
+    private Player             player;
+    private List<Enemy>        enemies;
+    private List<Projectile>   projectiles;
+    private List<Pickup>       pickups;
 
     // ------------------------------------------------------------------
     // Systems
     // ------------------------------------------------------------------
-    private AISystem       aiSystem;
-    private CombatSystem   combatSystem;
-    private PhysicsSystem  physicsSystem;
+    private AISystem         aiSystem;
+    private CombatSystem     combatSystem;
+    private PhysicsSystem    physicsSystem;
+    private ProjectileSystem projectileSystem;
+    private SpawnManager     spawnManager;
+    private VisionSystem     visionSystem;
+    private UpgradeManager   upgradeManager;
 
     // ------------------------------------------------------------------
     // UI
@@ -71,17 +90,16 @@ public class GameApp extends SimpleApplication {
     // ------------------------------------------------------------------
     // Game logic
     // ------------------------------------------------------------------
-    private GameEngine  gameEngine;
-    private GameState   gameState;
-    private final Random random = new Random();
+    private GameEngine     gameEngine;
+    private GameState      gameState;
+    private List<Upgrade>  currentUpgradeChoices;
+    private final Random   random = new Random();
 
     // ------------------------------------------------------------------
     // Constructor
     // ------------------------------------------------------------------
     public GameApp() {
-        // Pass an empty array to suppress the default FlyCamAppState,
-        // DebugKeysAppState and StatsAppState that SimpleApplication adds.
-        super(/* no default app-states */);
+        super();
     }
 
     // ------------------------------------------------------------------
@@ -89,15 +107,24 @@ public class GameApp extends SimpleApplication {
     // ------------------------------------------------------------------
     @Override
     public void simpleInitApp() {
-        // Suppress the built-in fly-cam so it doesn't fight our fixed camera
         flyCam.setEnabled(false);
 
         setupCamera();
         setupLighting();
 
-        // Initialise containers
-        enemies    = new ArrayList<>();
-        gameEngine = new GameEngine();
+        // Containers
+        enemies     = new ArrayList<>();
+        projectiles = new ArrayList<>();
+        pickups     = new ArrayList<>();
+
+        // Systems (difficulty-independent)
+        aiSystem         = new AISystem();
+        combatSystem     = new CombatSystem();
+        physicsSystem    = new PhysicsSystem();
+        projectileSystem = new ProjectileSystem();
+        visionSystem     = new VisionSystem();
+        upgradeManager   = new UpgradeManager();
+        gameEngine       = new GameEngine();
 
         // Input
         inputHandler = new InputHandler(inputManager);
@@ -106,44 +133,90 @@ public class GameApp extends SimpleApplication {
         levelManager = new LevelManager(assetManager, rootNode);
         levelManager.loadLevel(new Level1(assetManager, rootNode));
 
-        // Player
-        player = new Player(assetManager, 0f, 0f);
-        rootNode.attachChild(player.getNode());
-
-        // Systems
-        aiSystem      = new AISystem();
-        combatSystem  = new CombatSystem();
-        physicsSystem = new PhysicsSystem();
-
         // UI
         uiManager = new UIManager(assetManager, guiNode, settings);
 
-        // Begin in PLAYING state and kick off the first wave immediately
-        gameState = GameState.PLAYING;
-        spawnWave();
+        // Start at difficulty selection
+        gameState = GameState.DIFFICULTY_SELECT;
+        uiManager.showDifficultySelect();
     }
 
     @Override
     public void simpleUpdate(float tpf) {
-        // Pause toggle is handled regardless of current state
-        if (inputHandler.isPausePressed()) {
-            togglePause();
-            return;
-        }
-
         switch (gameState) {
-            case PLAYING  -> updatePlaying(tpf);
-            case GAME_OVER -> {
-                if (inputHandler.isRestartPressed()) restartGame();
+            case DIFFICULTY_SELECT -> handleDifficultySelect();
+            case PLAYING           -> updatePlaying(tpf);
+            case PAUSED            -> {
+                if (inputHandler.isPausePressed()) togglePause();
             }
-            default -> { /* PAUSED — do nothing */ }
+            case LEVEL_UP          -> handleLevelUpInput();
+            case GAME_OVER         -> {
+                if (inputHandler.isRestartPressed()) returnToDifficultySelect();
+            }
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Difficulty selection
+    // ------------------------------------------------------------------
+    private void handleDifficultySelect() {
+        int choice = inputHandler.consumeChoicePending();
+        if (choice < 0) return;
+        difficulty = switch (choice) {
+            case 0  -> Difficulty.EASY;
+            case 1  -> Difficulty.NORMAL;
+            case 2  -> Difficulty.HARD;
+            case 3  -> Difficulty.NIGHTMARE;
+            default -> Difficulty.NORMAL;
+        };
+        startNewGame();
+    }
+
+    private void startNewGame() {
+        // Remove any lingering entities
+        for (Enemy e : enemies)       rootNode.detachChild(e.getNode());
+        for (Projectile p : projectiles) rootNode.detachChild(p.getNode());
+        for (Pickup pk : pickups)     rootNode.detachChild(pk.getNode());
+        enemies.clear();
+        projectiles.clear();
+        pickups.clear();
+
+        if (player != null) rootNode.detachChild(player.getNode());
+
+        // Set difficulty on engine & spawn manager
+        gameEngine.setDifficulty(difficulty);
+        gameEngine.reset();
+        spawnManager = new SpawnManager(difficulty);
+        upgradeManager.reset();
+
+        // Create fresh player
+        player = new Player(assetManager, 0f, 0f, difficulty);
+        rootNode.attachChild(player.getNode());
+
+        uiManager.hideDifficultySelect();
+        uiManager.reset();
+
+        gameState = GameState.PLAYING;
     }
 
     // ------------------------------------------------------------------
     // Per-frame game logic (PLAYING state only)
     // ------------------------------------------------------------------
     private void updatePlaying(float tpf) {
+        if (inputHandler.isPausePressed()) {
+            togglePause();
+            return;
+        }
+
+        // --- Weapon cycling ---
+        if (inputHandler.isCycleWeaponPressed()) {
+            player.cycleWeapon();
+        }
+
+        // --- Vision toggle ---
+        if (inputHandler.isVisionTogglePressed()) {
+            player.toggleVisionMode();
+        }
 
         // --- Player movement ---
         float dx = 0f, dz = 0f;
@@ -152,7 +225,6 @@ public class GameApp extends SimpleApplication {
         if (inputHandler.isMoveUp())    dz -= 1f;
         if (inputHandler.isMoveDown())  dz += 1f;
 
-        // Normalise diagonal movement so speed is consistent
         if (dx != 0f && dz != 0f) {
             float inv = (float) (1.0 / Math.sqrt(dx * dx + dz * dz));
             dx *= inv;
@@ -160,12 +232,51 @@ public class GameApp extends SimpleApplication {
         }
 
         player.move(dx, dz, tpf);
+
+        // --- Mouse aim ---
+        Vector2f screenCursor = inputHandler.getCursorPosition();
+        float[] worldCursor = screenToWorld(screenCursor.x, screenCursor.y);
+        player.updateAim(worldCursor[0], worldCursor[1]);
+
         player.update(tpf);
 
-        // --- Player attack ---
-        if (inputHandler.isAttackPressed() && player.canAttack()) {
-            player.attack();
-            combatSystem.playerAttack(player, enemies);
+        // --- Shooting ---
+        if (inputHandler.isFireHeld()) {
+            if (player.tryFire()) {
+                spawnProjectiles();
+            }
+        }
+
+        // --- Projectiles ---
+        List<Enemy> deadEnemies = new ArrayList<>();
+        projectileSystem.update(projectiles, enemies, tpf);
+
+        // --- Enemy spawning (time-based) ---
+        List<Enemy> newEnemies = spawnManager.update(tpf, assetManager, enemies.size());
+        for (Enemy e : newEnemies) {
+            enemies.add(e);
+            rootNode.attachChild(e.getNode());
+            if (e.getEnemyType().isBoss) {
+                uiManager.showBossWarning(e.getEnemyType().displayName);
+            }
+        }
+
+        // --- Vision system ---
+        for (Enemy e : enemies) {
+            visionSystem.updateVisibility(e, player);
+        }
+        // EXP pickups also follow vision rules
+        for (Pickup pk : pickups) {
+            if (pk.getPickupType() == Pickup.PickupType.EXP) {
+                boolean vis = visionSystem.isVisible(
+                        pk.getPosition().x, pk.getPosition().z,
+                        player.getPosition().x, player.getPosition().z,
+                        player.getAimDirX(), player.getAimDirZ(),
+                        player.isCircleVision());
+                pk.getNode().setCullHint(vis
+                        ? com.jme3.scene.Spatial.CullHint.Never
+                        : com.jme3.scene.Spatial.CullHint.Always);
+            }
         }
 
         // --- Enemy updates ---
@@ -175,7 +286,13 @@ public class GameApp extends SimpleApplication {
             if (!e.isActive()) {
                 rootNode.detachChild(e.getNode());
                 it.remove();
-                gameEngine.recordKill();
+                onEnemyKilled(e);
+                if (e.getEnemyType().isBoss) {
+                    spawnManager.onBossDefeated();
+                    // Drop heart + mutation pickup
+                    spawnPickup(e.getPosition().x, e.getPosition().z, Pickup.PickupType.HEART, 0);
+                    spawnPickup(e.getPosition().x + 0.8f, e.getPosition().z, Pickup.PickupType.MUTATION, 0);
+                }
                 continue;
             }
             e.update(tpf);
@@ -183,14 +300,22 @@ public class GameApp extends SimpleApplication {
             combatSystem.enemyContactDamage(e, player, tpf);
         }
 
-        // --- Separation / collision resolution ---
+        // --- Physics / separation ---
         physicsSystem.resolveAll(enemies, player);
 
-        // --- Wave / engine tick ---
-        GameEngine.Event event = gameEngine.tick(tpf, enemies.size());
-        switch (event) {
-            case START_NEXT_WAVE -> spawnWave();
-            default -> { /* NONE or WAVE_CLEARED — HUD shows countdown */ }
+        // --- Pickups ---
+        Iterator<Pickup> pit = pickups.iterator();
+        while (pit.hasNext()) {
+            Pickup pk = pit.next();
+            if (!pk.isActive()) {
+                rootNode.detachChild(pk.getNode());
+                pit.remove();
+                continue;
+            }
+            if (pk.canBeCollectedBy(player.getPosition().x, player.getPosition().z)) {
+                applyPickup(pk);
+                pk.setActive(false);
+            }
         }
 
         // --- Game over check ---
@@ -199,49 +324,140 @@ public class GameApp extends SimpleApplication {
             return;
         }
 
-        // --- HUD update ---
-        uiManager.update(
-                player,
-                gameEngine.getCurrentWave(),
-                gameEngine.getScore(),
-                gameState,
-                gameEngine.getWaveCountdown(),
-                gameEngine.isWaitingForWave(),
-                tpf
+        // --- Level up check ---
+        if (player.consumeLevelUp()) {
+            triggerLevelUp();
+            return;
+        }
+
+        // --- HUD ---
+        uiManager.update(player, gameEngine.getScore(), gameState,
+                gameEngine.getWaveCountdown(), gameEngine.isWaitingForWave(), tpf);
+        uiManager.updateTimeAndVision(
+                spawnManager.getElapsedSeconds(), player.isCircleVision());
+    }
+
+    // ------------------------------------------------------------------
+    // Level-up flow
+    // ------------------------------------------------------------------
+    private void triggerLevelUp() {
+        currentUpgradeChoices = upgradeManager.generateChoices();
+        if (currentUpgradeChoices.isEmpty()) {
+            // No upgrades available — just continue
+            return;
+        }
+        gameState = GameState.LEVEL_UP;
+        uiManager.showLevelUpMenu(
+                player.getLevel(),
+                currentUpgradeChoices,
+                upgradeManager.getRerollsLeft(),
+                upgradeManager.getDeletesLeft()
         );
     }
 
-    // ------------------------------------------------------------------
-    // Wave spawning
-    // ------------------------------------------------------------------
-    private void spawnWave() {
-        gameEngine.advanceWave();
-        int   count = gameEngine.enemiesForNextWave();
-        float speed = gameEngine.speedForNextWave();
-
-        for (int i = 0; i < count; i++) {
-            spawnEnemy(speed);
+    private void handleLevelUpInput() {
+        int choice = inputHandler.consumeChoicePending();
+        if (choice >= 0 && choice < currentUpgradeChoices.size()) {
+            upgradeManager.applyUpgrade(currentUpgradeChoices.get(choice));
+            uiManager.hideLevelUpMenu();
+            gameState = GameState.PLAYING;
+            return;
         }
 
-        uiManager.showWaveAnnouncement("WAVE " + gameEngine.getCurrentWave());
+        if (inputHandler.isRerollPressed()) {
+            List<Upgrade> rerolled = upgradeManager.reroll();
+            if (rerolled != null) {
+                currentUpgradeChoices = rerolled;
+                uiManager.showLevelUpMenu(
+                        player.getLevel(), currentUpgradeChoices,
+                        upgradeManager.getRerollsLeft(),
+                        upgradeManager.getDeletesLeft());
+            }
+        }
+
+        if (inputHandler.isDeletePressed()) {
+            if (upgradeManager.delete()) {
+                uiManager.hideLevelUpMenu();
+                gameState = GameState.PLAYING;
+            }
+        }
     }
 
-    private void spawnEnemy(float speed) {
-        float hw = Constants.LEVEL_HALF_WIDTH  - 1.2f;
-        float hh = Constants.LEVEL_HALF_HEIGHT - 1.2f;
-        float x, z;
+    // ------------------------------------------------------------------
+    // Shooting helpers
+    // ------------------------------------------------------------------
+    /**
+     * Spawns one or more projectiles from the player's current weapon position
+     * toward the aim direction, applying spread for multi-pellet weapons.
+     */
+    private void spawnProjectiles() {
+        WeaponStats stats  = player.getActiveWeapon().getStats();
+        float       baseAX = player.getAimDirX();
+        float       baseAZ = player.getAimDirZ();
+        float       startX = player.getPosition().x;
+        float       startZ = player.getPosition().z;
 
-        // Place enemy along one of the four edges, chosen at random
-        switch (random.nextInt(4)) {
-            case 0  -> { x = -hw + random.nextFloat() * 2f * hw; z = -hh; } // top
-            case 1  -> { x = -hw + random.nextFloat() * 2f * hw; z =  hh; } // bottom
-            case 2  -> { x = -hw; z = -hh + random.nextFloat() * 2f * hh; } // left
-            default -> { x =  hw; z = -hh + random.nextFloat() * 2f * hh; } // right
+        // Apply upgrade multipliers
+        float finalDamage   = stats.damage   * upgradeManager.getDamageMult();
+        float finalFireRate = stats.fireRate  * upgradeManager.getFireRateMult();
+        int   finalPierce   = stats.pierce    + upgradeManager.getBonusPierce();
+        int   finalRicochet = stats.ricochet  + upgradeManager.getBonusRicochet();
+
+        int pellets = stats.pelletsPerShot;
+        for (int i = 0; i < pellets; i++) {
+            float angle = 0f;
+            if (pellets > 1) {
+                angle = -stats.spreadAngle + (2f * stats.spreadAngle / (pellets - 1)) * i;
+            }
+            float cos = (float) Math.cos(angle);
+            float sin = (float) Math.sin(angle);
+            float ax  = baseAX * cos - baseAZ * sin;
+            float az  = baseAX * sin + baseAZ * cos;
+
+            Projectile proj = new Projectile(
+                    assetManager,
+                    startX, startZ,
+                    ax, az,
+                    stats.bulletSpeed,
+                    finalDamage,
+                    stats.bulletSize,
+                    finalPierce,
+                    finalRicochet,
+                    Constants.LEVEL_HALF_WIDTH,
+                    Constants.LEVEL_HALF_HEIGHT
+            );
+            projectiles.add(proj);
+            rootNode.attachChild(proj.getNode());
         }
+    }
 
-        Enemy enemy = new Enemy(assetManager, x, z, speed);
-        enemies.add(enemy);
-        rootNode.attachChild(enemy.getNode());
+    // ------------------------------------------------------------------
+    // Kill / pickup helpers
+    // ------------------------------------------------------------------
+    private void onEnemyKilled(Enemy e) {
+        gameEngine.recordKill(e.getEnemyType());
+        int creditsEarned = (int) (e.getEnemyType().scoreValue
+                * Constants.CREDITS_PER_SCORE * difficulty.scoreMultiplier);
+        player.addCredits(creditsEarned);
+        // Award EXP
+        player.addExp(e.getEnemyType().expValue, difficulty.expGainMult);
+        // Drop EXP orb
+        spawnPickup(e.getPosition().x, e.getPosition().z,
+                Pickup.PickupType.EXP, e.getEnemyType().expValue);
+    }
+
+    private void spawnPickup(float x, float z, Pickup.PickupType type, int expAmount) {
+        Pickup pk = new Pickup(assetManager, x, z, type, expAmount);
+        pickups.add(pk);
+        rootNode.attachChild(pk.getNode());
+    }
+
+    private void applyPickup(Pickup pk) {
+        switch (pk.getPickupType()) {
+            case HEART    -> player.heal();
+            case EXP      -> player.addExp(pk.getExpAmount(), difficulty.expGainMult);
+            case MUTATION -> triggerLevelUp(); // boss mutation triggers an extra level-up
+        }
     }
 
     // ------------------------------------------------------------------
@@ -262,49 +478,51 @@ public class GameApp extends SimpleApplication {
         uiManager.showGameOverOverlay(gameEngine.getScore());
     }
 
-    private void restartGame() {
-        // Remove all enemies from the scene
-        for (Enemy e : enemies) {
-            rootNode.detachChild(e.getNode());
-        }
-        enemies.clear();
-
-        // Remove old player and create a fresh one
-        rootNode.detachChild(player.getNode());
-        player = new Player(assetManager, 0f, 0f);
-        rootNode.attachChild(player.getNode());
-
-        // Reset game engine (score, wave, counters)
-        gameEngine.reset();
-
-        // Reset UI
+    private void returnToDifficultySelect() {
+        gameState = GameState.DIFFICULTY_SELECT;
         uiManager.reset();
+        uiManager.showDifficultySelect();
+    }
 
-        // Re-enter playing state and start wave 1
-        gameState = GameState.PLAYING;
-        spawnWave();
+    // ------------------------------------------------------------------
+    // Screen-to-world projection helper
+    // ------------------------------------------------------------------
+    /**
+     * Projects a screen-space pixel coordinate onto the Y=0 world plane using
+     * the orthographic camera, returning [worldX, worldZ].
+     */
+    private float[] screenToWorld(float screenX, float screenY) {
+        // In an orthographic top-down setup the projection is linear.
+        float aspect    = (float) cam.getWidth() / cam.getHeight();
+        float viewHalfH = Constants.LEVEL_HALF_HEIGHT + 1.5f;
+        float viewHalfW = viewHalfH * aspect;
+
+        float ndcX = (screenX / cam.getWidth())  * 2f - 1f;
+        float ndcY = (screenY / cam.getHeight()) * 2f - 1f;
+
+        float worldX = ndcX * viewHalfW;
+        float worldZ = -ndcY * viewHalfH; // Y flipped (screen Y-down vs world Y-up)
+        return new float[]{ worldX, worldZ };
     }
 
     // ------------------------------------------------------------------
     // Scene setup helpers
     // ------------------------------------------------------------------
     private void setupCamera() {
-        // Lock camera at a fixed position directly above the origin
         cam.setLocation(new Vector3f(0f, Constants.CAMERA_HEIGHT, 0f));
         cam.lookAtDirection(new Vector3f(0f, -1f, 0f), new Vector3f(0f, 0f, -1f));
         cam.setParallelProjection(true);
 
-        // Set the orthographic frustum so the level fills the screen nicely
-        float aspect     = (float) cam.getWidth() / (float) cam.getHeight();
-        float viewHalfH  = Constants.LEVEL_HALF_HEIGHT + 1.5f;
-        float viewHalfW  = viewHalfH * aspect;
+        float aspect    = (float) cam.getWidth() / (float) cam.getHeight();
+        float viewHalfH = Constants.LEVEL_HALF_HEIGHT + 1.5f;
+        float viewHalfW = viewHalfH * aspect;
         cam.setFrustum(-1000f, 1000f, -viewHalfW, viewHalfW, -viewHalfH, viewHalfH);
     }
 
     private void setupLighting() {
-        // Full-brightness ambient light so unshaded materials are visible
+        // Dim ambient light to suggest darkness outside vision range
         AmbientLight ambient = new AmbientLight();
-        ambient.setColor(ColorRGBA.White.mult(2f));
+        ambient.setColor(new ColorRGBA(0.4f, 0.4f, 0.45f, 1f));
         rootNode.addLight(ambient);
     }
 }
