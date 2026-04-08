@@ -107,6 +107,14 @@ public class UIManager {
         hud.showGameOverOverlay(finalScore);
     }
 
+    public boolean isGameOverRestartClicked(float mx, float my) {
+        return hud.isGameOverRestartClicked(mx, my);
+    }
+
+    public void updateGameOverHover(float mx, float my) {
+        hud.updateGameOverHover(mx, my);
+    }
+
     // ------------------------------------------------------------------
     // Difficulty select
     // ------------------------------------------------------------------
@@ -139,6 +147,14 @@ public class UIManager {
 
     public int getWeaponClickedOption(float mx, float my) {
         return hud.getWeaponClickedOption(mx, my);
+    }
+
+    public boolean isWeaponNavNextClicked(float mx, float my) {
+        return hud.isNavNextClicked(mx, my);
+    }
+
+    public boolean isWeaponNavPrevClicked(float mx, float my) {
+        return hud.isNavPrevClicked(mx, my);
     }
 
     public void updateWeaponSelectHover(float mx, float my) {

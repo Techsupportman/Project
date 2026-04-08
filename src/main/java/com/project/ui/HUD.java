@@ -171,7 +171,7 @@ public class HUD {
 
         // ---- Game-over restart button ----
         gameOverRestartBtn = new Button(assetManager, guiNode, font,
-                "Press R to Restart",
+                "Restart",
                 screenW * 0.5f - 150f, screenH * 0.35f, 300f, 52f);
     }
 
@@ -303,6 +303,16 @@ public class HUD {
         return -1;
     }
 
+    /** Returns {@code true} when (mx, my) lands on the "Next Page" nav button. */
+    public boolean isNavNextClicked(float mx, float my) {
+        return weaponNavNext.hitTest(mx, my);
+    }
+
+    /** Returns {@code true} when (mx, my) lands on the "Prev Page" nav button. */
+    public boolean isNavPrevClicked(float mx, float my) {
+        return weaponNavPrev.hitTest(mx, my);
+    }
+
     public void updateWeaponSelectHover(float mx, float my) {
         for (Button b : weaponButtons) b.setHovered(b.hitTest(mx, my));
         weaponNavNext.setHovered(weaponNavNext.hitTest(mx, my));
@@ -378,6 +388,16 @@ public class HUD {
         subMessage.setText("Final Score: " + finalScore);
         recenterMessage();
         gameOverRestartBtn.show();
+    }
+
+    /** Returns {@code true} when (mx, my) lands on the game-over restart button. */
+    public boolean isGameOverRestartClicked(float mx, float my) {
+        return gameOverRestartBtn.hitTest(mx, my);
+    }
+
+    /** Updates the hover state of the game-over restart button. */
+    public void updateGameOverHover(float mx, float my) {
+        gameOverRestartBtn.setHovered(gameOverRestartBtn.hitTest(mx, my));
     }
 
     public void showBossWarning(String bossName) {

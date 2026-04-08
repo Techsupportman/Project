@@ -22,9 +22,7 @@ import com.jme3.math.Vector2f;
  * <h3>One-shot inputs</h3>
  * <ul>
  *   <li>ESC — pause/resume</li>
- *   <li>R — restart</li>
  *   <li>Q — toggle fire lock (auto-fire)</li>
- *   <li>1-9 — confirm level-up choice index</li>
  * </ul>
  */
 public class InputHandler implements ActionListener {
@@ -39,15 +37,7 @@ public class InputHandler implements ActionListener {
     private static final String FIRE           = "Fire";
     private static final String PAUSE          = "Pause";
     private static final String ESCAPE         = "Escape";
-    private static final String RESTART        = "Restart";
     private static final String FIRE_LOCK      = "FireLock";
-    private static final String CHOICE_1       = "Choice1";
-    private static final String CHOICE_2       = "Choice2";
-    private static final String CHOICE_3       = "Choice3";
-    private static final String CHOICE_4       = "Choice4";
-    private static final String CHOICE_5       = "Choice5";
-    private static final String REROLL         = "Reroll";
-    private static final String DELETE         = "Delete";
 
     // ------------------------------------------------------------------
     // State
@@ -62,11 +52,7 @@ public class InputHandler implements ActionListener {
     // One-shot flags
     private boolean pausePending;
     private boolean escapePending;
-    private boolean restartPending;
     private boolean fireLockPending;
-    private int     choicePending = -1;  // -1 = no pending choice
-    private boolean rerollPending;
-    private boolean deletePending;
 
     // Mouse cursor position in screen space (updated via AnalogListener)
     private final Vector2f cursorPos = new Vector2f();
@@ -103,25 +89,13 @@ public class InputHandler implements ActionListener {
         // System
         inputManager.addMapping(PAUSE,   new KeyTrigger(KeyInput.KEY_ESCAPE));
         inputManager.addMapping(ESCAPE,  new KeyTrigger(KeyInput.KEY_ESCAPE));
-        inputManager.addMapping(RESTART, new KeyTrigger(KeyInput.KEY_R));
 
         // Fire lock toggle
         inputManager.addMapping(FIRE_LOCK, new KeyTrigger(KeyInput.KEY_Q));
 
-        // Level-up choices (1-5) and meta-actions
-        inputManager.addMapping(CHOICE_1, new KeyTrigger(KeyInput.KEY_1));
-        inputManager.addMapping(CHOICE_2, new KeyTrigger(KeyInput.KEY_2));
-        inputManager.addMapping(CHOICE_3, new KeyTrigger(KeyInput.KEY_3));
-        inputManager.addMapping(CHOICE_4, new KeyTrigger(KeyInput.KEY_4));
-        inputManager.addMapping(CHOICE_5, new KeyTrigger(KeyInput.KEY_5));
-        inputManager.addMapping(REROLL,   new KeyTrigger(KeyInput.KEY_F));
-        inputManager.addMapping(DELETE,   new KeyTrigger(KeyInput.KEY_G));
-
         inputManager.addListener(this,
                 MOVE_LEFT, MOVE_RIGHT, MOVE_UP, MOVE_DOWN,
-                FIRE, PAUSE, ESCAPE, RESTART, FIRE_LOCK,
-                CHOICE_1, CHOICE_2, CHOICE_3, CHOICE_4, CHOICE_5,
-                REROLL, DELETE);
+                FIRE, PAUSE, ESCAPE, FIRE_LOCK);
 
         // Cursor tracking via hardware cursor
         inputManager.setCursorVisible(true);
@@ -140,15 +114,7 @@ public class InputHandler implements ActionListener {
             case FIRE          -> { fireHeld = isPressed; if (isPressed) lmbJustPressed = true; }
             case PAUSE         -> { if (isPressed) pausePending         = true; }
             case ESCAPE        -> { if (isPressed) escapePending        = true; }
-            case RESTART       -> { if (isPressed) restartPending       = true; }
             case FIRE_LOCK     -> { if (isPressed) fireLockPending      = true; }
-            case CHOICE_1      -> { if (isPressed) choicePending = 0; }
-            case CHOICE_2      -> { if (isPressed) choicePending = 1; }
-            case CHOICE_3      -> { if (isPressed) choicePending = 2; }
-            case CHOICE_4      -> { if (isPressed) choicePending = 3; }
-            case CHOICE_5      -> { if (isPressed) choicePending = 4; }
-            case REROLL        -> { if (isPressed) rerollPending  = true; }
-            case DELETE        -> { if (isPressed) deletePending  = true; }
         }
     }
 
@@ -187,11 +153,6 @@ public class InputHandler implements ActionListener {
         return false;
     }
 
-    public boolean isRestartPressed() {
-        if (restartPending) { restartPending = false; return true; }
-        return false;
-    }
-
     public boolean isFireLockPressed() {
         if (fireLockPending) { fireLockPending = false; return true; }
         return false;
@@ -203,26 +164,6 @@ public class InputHandler implements ActionListener {
      */
     public boolean isLmbJustPressed() {
         if (lmbJustPressed) { lmbJustPressed = false; return true; }
-        return false;
-    }
-
-    /**
-     * Returns the index (0-based) of the level-up choice the player pressed,
-     * or -1 if no choice was pressed this frame.
-     */
-    public int consumeChoicePending() {
-        int c = choicePending;
-        choicePending = -1;
-        return c;
-    }
-
-    public boolean isRerollPressed() {
-        if (rerollPending) { rerollPending = false; return true; }
-        return false;
-    }
-
-    public boolean isDeletePressed() {
-        if (deletePending) { deletePending = false; return true; }
         return false;
     }
 
