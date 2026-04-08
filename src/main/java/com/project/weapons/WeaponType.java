@@ -44,7 +44,7 @@ public enum WeaponType {
     // Tier 5 — Exotic
     // ------------------------------------------------------------------
     FLAK        ("Flak",        new WeaponStats(8f,   2f,   14f, 0.14f, 0, 2, 6, 0.45f, 280)),
-    LASER       ("Laser",       new WeaponStats(5f,  15f,   30f, 0.08f, 2, 0, 1, 0f,    260)),
+    LASER       ("Laser",       new WeaponStats(5f,  15f,   30f, 0.08f, 2, 0, 1, 0f,    270)),
     SHOTGUN_SNG ("Super Shotgun",new WeaponStats(14f, 1.2f, 14f, 0.13f, 0, 0, 10,0.60f, 320)),
 
     // ------------------------------------------------------------------
