@@ -202,6 +202,14 @@ public class GameApp extends SimpleApplication {
             showCurrentWeaponPage(); return;
         }
         if (inputHandler.isLmbJustPressed()) {
+            if (uiManager.isWeaponNavNextClicked(cursor.x, cursor.y)) {
+                weaponSelectPage = (weaponSelectPage + 1) % TOTAL_PAGES;
+                showCurrentWeaponPage(); return;
+            }
+            if (uiManager.isWeaponNavPrevClicked(cursor.x, cursor.y)) {
+                weaponSelectPage = (weaponSelectPage - 1 + TOTAL_PAGES) % TOTAL_PAGES;
+                showCurrentWeaponPage(); return;
+            }
             int clicked = uiManager.getWeaponClickedOption(cursor.x, cursor.y);
             if (clicked >= 0) {
                 int idx = weaponSelectPage * WEAPONS_PER_PAGE + clicked;

@@ -141,6 +141,14 @@ public class UIManager {
         return hud.getWeaponClickedOption(mx, my);
     }
 
+    public boolean isWeaponNavNextClicked(float mx, float my) {
+        return hud.isNavNextClicked(mx, my);
+    }
+
+    public boolean isWeaponNavPrevClicked(float mx, float my) {
+        return hud.isNavPrevClicked(mx, my);
+    }
+
     public void updateWeaponSelectHover(float mx, float my) {
         hud.updateWeaponSelectHover(mx, my);
     }
