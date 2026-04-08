@@ -76,18 +76,6 @@ public final class Constants {
     public static final int   MAX_ENEMIES_ALIVE         = 80;
 
     // -------------------------------------------------------------------------
-    // Vision system
-    // -------------------------------------------------------------------------
-    /** Radius (world units) for circle vision mode. */
-    public static final float VISION_CIRCLE_RADIUS   = 7.0f;
-    /** Range (world units) for cone vision mode. */
-    public static final float VISION_CONE_RANGE      = 12.0f;
-    /** Half-angle (radians) of the cone in cone vision mode (~50°). */
-    public static final float VISION_CONE_HALF_ANGLE = (float) Math.toRadians(50.0);
-    /** Near-radius always revealed in cone mode (so player isn't blind beside them). */
-    public static final float VISION_CONE_NEAR_RADIUS = 3.5f;
-
-    // -------------------------------------------------------------------------
     // EXP & Levelling
     // -------------------------------------------------------------------------
     /** Base EXP required to reach level 2 (each level costs 10% more). */

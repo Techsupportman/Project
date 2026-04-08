@@ -93,7 +93,7 @@ public class HUD {
                 new ColorRGBA(1.0f, 0.6f, 0.0f, 1f));
 
         controlsHint.setText(
-                "WASD: Move  |  LMB: Fire  |  Q: Toggle Fire-Lock  |  E: Cycle Weapon  |  P/ESC: Pause");
+                "WASD: Move  |  LMB: Fire  |  Q: Toggle Fire-Lock  |  ESC: Pause");
         controlsHint.setLocalTranslation(10f, 28f, 0f);
         fireLockText.setText("");
         fireLockText.setLocalTranslation(10f, 50f, 0f);

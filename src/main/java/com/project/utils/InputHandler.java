@@ -21,11 +21,9 @@ import com.jme3.math.Vector2f;
  *
  * <h3>One-shot inputs</h3>
  * <ul>
- *   <li>P / ESC — pause/resume</li>
+ *   <li>ESC — pause/resume</li>
  *   <li>R — restart</li>
- *   <li>Right Mouse Button — toggle circle/cone vision</li>
  *   <li>Q — toggle fire lock (auto-fire)</li>
- *   <li>E — cycle weapon</li>
  *   <li>1-9 — confirm level-up choice index</li>
  * </ul>
  */
@@ -39,11 +37,9 @@ public class InputHandler implements ActionListener {
     private static final String MOVE_UP        = "MoveUp";
     private static final String MOVE_DOWN      = "MoveDown";
     private static final String FIRE           = "Fire";
-    private static final String VISION_TOGGLE  = "VisionToggle";
     private static final String PAUSE          = "Pause";
     private static final String ESCAPE         = "Escape";
     private static final String RESTART        = "Restart";
-    private static final String CYCLE_WEAPON   = "CycleWeapon";
     private static final String FIRE_LOCK      = "FireLock";
     private static final String CHOICE_1       = "Choice1";
     private static final String CHOICE_2       = "Choice2";
@@ -64,11 +60,9 @@ public class InputHandler implements ActionListener {
     private boolean lmbJustPressed; // LMB pressed this frame (one-shot, for menu clicks)
 
     // One-shot flags
-    private boolean visionTogglePending;
     private boolean pausePending;
     private boolean escapePending;
     private boolean restartPending;
-    private boolean cycleWeaponPending;
     private boolean fireLockPending;
     private int     choicePending = -1;  // -1 = no pending choice
     private boolean rerollPending;
@@ -103,17 +97,13 @@ public class InputHandler implements ActionListener {
                 new KeyTrigger(KeyInput.KEY_S),
                 new KeyTrigger(KeyInput.KEY_DOWN));
 
-        // Shooting & vision
+        // Shooting
         inputManager.addMapping(FIRE,          new MouseButtonTrigger(MouseInput.BUTTON_LEFT));
-        inputManager.addMapping(VISION_TOGGLE, new MouseButtonTrigger(MouseInput.BUTTON_RIGHT));
 
         // System
-        inputManager.addMapping(PAUSE,   new KeyTrigger(KeyInput.KEY_P));
+        inputManager.addMapping(PAUSE,   new KeyTrigger(KeyInput.KEY_ESCAPE));
         inputManager.addMapping(ESCAPE,  new KeyTrigger(KeyInput.KEY_ESCAPE));
         inputManager.addMapping(RESTART, new KeyTrigger(KeyInput.KEY_R));
-
-        // Weapon cycling (E only; Q is now fire-lock)
-        inputManager.addMapping(CYCLE_WEAPON, new KeyTrigger(KeyInput.KEY_E));
 
         // Fire lock toggle
         inputManager.addMapping(FIRE_LOCK, new KeyTrigger(KeyInput.KEY_Q));
@@ -129,7 +119,7 @@ public class InputHandler implements ActionListener {
 
         inputManager.addListener(this,
                 MOVE_LEFT, MOVE_RIGHT, MOVE_UP, MOVE_DOWN,
-                FIRE, VISION_TOGGLE, PAUSE, ESCAPE, RESTART, CYCLE_WEAPON, FIRE_LOCK,
+                FIRE, PAUSE, ESCAPE, RESTART, FIRE_LOCK,
                 CHOICE_1, CHOICE_2, CHOICE_3, CHOICE_4, CHOICE_5,
                 REROLL, DELETE);
 
@@ -148,11 +138,9 @@ public class InputHandler implements ActionListener {
             case MOVE_UP       -> moveUp    = isPressed;
             case MOVE_DOWN     -> moveDown  = isPressed;
             case FIRE          -> { fireHeld = isPressed; if (isPressed) lmbJustPressed = true; }
-            case VISION_TOGGLE -> { if (isPressed) visionTogglePending = true; }
             case PAUSE         -> { if (isPressed) pausePending         = true; }
             case ESCAPE        -> { if (isPressed) escapePending        = true; }
             case RESTART       -> { if (isPressed) restartPending       = true; }
-            case CYCLE_WEAPON  -> { if (isPressed) cycleWeaponPending   = true; }
             case FIRE_LOCK     -> { if (isPressed) fireLockPending      = true; }
             case CHOICE_1      -> { if (isPressed) choicePending = 0; }
             case CHOICE_2      -> { if (isPressed) choicePending = 1; }
@@ -189,11 +177,6 @@ public class InputHandler implements ActionListener {
     // ------------------------------------------------------------------
     // One-shot action getters (consume the flag on read)
     // ------------------------------------------------------------------
-    public boolean isVisionTogglePressed() {
-        if (visionTogglePending) { visionTogglePending = false; return true; }
-        return false;
-    }
-
     public boolean isPausePressed() {
         if (pausePending)   { pausePending   = false; return true; }
         return false;
@@ -206,11 +189,6 @@ public class InputHandler implements ActionListener {
 
     public boolean isRestartPressed() {
         if (restartPending) { restartPending = false; return true; }
-        return false;
-    }
-
-    public boolean isCycleWeaponPressed() {
-        if (cycleWeaponPending) { cycleWeaponPending = false; return true; }
         return false;
     }
 
