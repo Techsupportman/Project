@@ -31,7 +31,11 @@ public class Projectile extends GameObject {
     private int   pierceRemaining;
     private int   ricochetRemaining;
 
-    /** Maximum flight distance before the bullet despawns (prevents infinite travel). */
+    /**
+     * Maximum flight distance before the bullet despawns.
+     * Increased from 50f since there are no arena walls and the camera
+     * follows the player, so bullets need a longer travel range.
+     */
     private static final float MAX_RANGE = 80f;
     private float distanceTravelled = 0f;
 

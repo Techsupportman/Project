@@ -72,12 +72,7 @@ public class Button {
         guiNode.attachChild(bgGeo);
 
         // Border outlines (z=0.5) — top, bottom, left, right
-        float[][] borderDims = {
-            { x,          y + h - BORDER, w,     BORDER }, // top
-            { x,          y,              w,     BORDER }, // bottom
-            { x,          y,              BORDER, h     }, // left
-            { x + w - BORDER, y,          BORDER, h     }  // right
-        };
+        float[][] borderDims = calculateBorderDimensions();
         for (int i = 0; i < 4; i++) {
             Quad bq = new Quad(borderDims[i][2], borderDims[i][3]);
             borderGeos[i] = new Geometry("btn-border-" + i, bq);
@@ -156,15 +151,19 @@ public class Button {
         label.setLocalTranslation(lx, ly, 1f);
     }
 
-    private void repositionBorders() {
-        float[][] borderDims = {
-            { x,          y + h - BORDER, w,     BORDER },
-            { x,          y,              w,     BORDER },
-            { x,          y,              BORDER, h     },
-            { x + w - BORDER, y,          BORDER, h     }
+    private float[][] calculateBorderDimensions() {
+        return new float[][] {
+            { x,              y + h - BORDER, w,     BORDER }, // top
+            { x,              y,              w,     BORDER }, // bottom
+            { x,              y,              BORDER, h     }, // left
+            { x + w - BORDER, y,              BORDER, h     }  // right
         };
+    }
+
+    private void repositionBorders() {
+        float[][] dims = calculateBorderDimensions();
         for (int i = 0; i < 4; i++) {
-            borderGeos[i].setLocalTranslation(borderDims[i][0], borderDims[i][1], 0.5f);
+            borderGeos[i].setLocalTranslation(dims[i][0], dims[i][1], 0.5f);
         }
     }
 }

@@ -361,7 +361,7 @@ public class GameApp extends SimpleApplication {
             float pdz = proj.getPosition().z - player.getPosition().z;
             float dist = (float) Math.sqrt(pdx * pdx + pdz * pdz);
             if (dist <= proj.getSize() + Constants.PLAYER_SIZE) {
-                // Damage is stored as half-hearts; take one full heart if ≥ 1, else half
+                // Deal one heart of damage and deactivate the projectile
                 player.takeDamage();
                 proj.onHit(); // deactivates it
                 rootNode.detachChild(proj.getNode());
