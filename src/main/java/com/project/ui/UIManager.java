@@ -107,6 +107,14 @@ public class UIManager {
         hud.showGameOverOverlay(finalScore);
     }
 
+    public boolean isGameOverRestartClicked(float mx, float my) {
+        return hud.isGameOverRestartClicked(mx, my);
+    }
+
+    public void updateGameOverHover(float mx, float my) {
+        hud.updateGameOverHover(mx, my);
+    }
+
     // ------------------------------------------------------------------
     // Difficulty select
     // ------------------------------------------------------------------

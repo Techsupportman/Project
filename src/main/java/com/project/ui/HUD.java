@@ -171,7 +171,7 @@ public class HUD {
 
         // ---- Game-over restart button ----
         gameOverRestartBtn = new Button(assetManager, guiNode, font,
-                "Press R to Restart",
+                "Restart",
                 screenW * 0.5f - 150f, screenH * 0.35f, 300f, 52f);
     }
 
@@ -388,6 +388,16 @@ public class HUD {
         subMessage.setText("Final Score: " + finalScore);
         recenterMessage();
         gameOverRestartBtn.show();
+    }
+
+    /** Returns {@code true} when (mx, my) lands on the game-over restart button. */
+    public boolean isGameOverRestartClicked(float mx, float my) {
+        return gameOverRestartBtn.hitTest(mx, my);
+    }
+
+    /** Updates the hover state of the game-over restart button. */
+    public void updateGameOverHover(float mx, float my) {
+        gameOverRestartBtn.setHovered(gameOverRestartBtn.hitTest(mx, my));
     }
 
     public void showBossWarning(String bossName) {

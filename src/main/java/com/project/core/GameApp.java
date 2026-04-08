@@ -146,7 +146,12 @@ public class GameApp extends SimpleApplication {
             case SETTINGS          -> handleSettingsInput();
             case LEVEL_UP          -> handleLevelUpInput();
             case GAME_OVER         -> {
-                if (inputHandler.isRestartPressed()) returnToDifficultySelect();
+                Vector2f cursor = inputHandler.getCursorPosition();
+                uiManager.updateGameOverHover(cursor.x, cursor.y);
+                if (inputHandler.isLmbJustPressed()
+                        && uiManager.isGameOverRestartClicked(cursor.x, cursor.y)) {
+                    returnToDifficultySelect();
+                }
             }
         }
     }
@@ -166,8 +171,6 @@ public class GameApp extends SimpleApplication {
             int clicked = uiManager.getDifficultyClickedOption(cursor.x, cursor.y);
             if (clicked >= 0) { applyDifficultyChoice(clicked); return; }
         }
-        int choice = inputHandler.consumeChoicePending();
-        if (choice >= 0 && choice <= 3) applyDifficultyChoice(choice);
     }
 
     private void applyDifficultyChoice(int choice) {
@@ -193,14 +196,6 @@ public class GameApp extends SimpleApplication {
     private void handleWeaponSelect() {
         Vector2f cursor = inputHandler.getCursorPosition();
         uiManager.updateWeaponSelectHover(cursor.x, cursor.y);
-        if (inputHandler.isRerollPressed()) {
-            weaponSelectPage = (weaponSelectPage + 1) % TOTAL_PAGES;
-            showCurrentWeaponPage(); return;
-        }
-        if (inputHandler.isDeletePressed()) {
-            weaponSelectPage = (weaponSelectPage - 1 + TOTAL_PAGES) % TOTAL_PAGES;
-            showCurrentWeaponPage(); return;
-        }
         if (inputHandler.isLmbJustPressed()) {
             if (uiManager.isWeaponNavNextClicked(cursor.x, cursor.y)) {
                 weaponSelectPage = (weaponSelectPage + 1) % TOTAL_PAGES;
@@ -218,15 +213,6 @@ public class GameApp extends SimpleApplication {
                     uiManager.hideWeaponSelect();
                     startNewGame(); return;
                 }
-            }
-        }
-        int choice = inputHandler.consumeChoicePending();
-        if (choice >= 0) {
-            int idx = weaponSelectPage * WEAPONS_PER_PAGE + choice;
-            if (idx < ALL_WEAPONS.length) {
-                selectedWeapon = ALL_WEAPONS[idx];
-                uiManager.hideWeaponSelect();
-                startNewGame();
             }
         }
     }
@@ -353,10 +339,6 @@ public class GameApp extends SimpleApplication {
         if (inputHandler.isPausePressed() || inputHandler.isEscapePressed()) {
             togglePause(); return;
         }
-        if (inputHandler.isRestartPressed()) {
-            uiManager.showPauseOverlay(false);
-            returnToDifficultySelect(); return;
-        }
         if (inputHandler.isLmbJustPressed()) {
             int clicked = uiManager.getPauseMenuClickedOption(cursor.x, cursor.y);
             switch (clicked) {
@@ -428,20 +410,6 @@ public class GameApp extends SimpleApplication {
                 if (upgradeManager.delete()) { uiManager.hideLevelUpMenu(); gameState = GameState.PLAYING; }
                 return;
             }
-        }
-        int choice = inputHandler.consumeChoicePending();
-        if (choice >= 0 && choice < currentUpgradeChoices.size()) {
-            upgradeManager.applyUpgrade(currentUpgradeChoices.get(choice));
-            uiManager.hideLevelUpMenu(); gameState = GameState.PLAYING; return;
-        }
-        if (inputHandler.isRerollPressed()) {
-            List<Upgrade> r = upgradeManager.reroll();
-            if (r != null) { currentUpgradeChoices = r;
-                uiManager.showLevelUpMenu(player.getLevel(), r,
-                        upgradeManager.getRerollsLeft(), upgradeManager.getDeletesLeft()); }
-        }
-        if (inputHandler.isDeletePressed()) {
-            if (upgradeManager.delete()) { uiManager.hideLevelUpMenu(); gameState = GameState.PLAYING; }
         }
     }
 
@@ -586,7 +554,7 @@ public class GameApp extends SimpleApplication {
     private void updateCameraFrustum(int w, int h) {
         if (cam == null) return;
         float aspect=((float)w)/h, viewHalfH=Constants.LEVEL_HALF_HEIGHT+1.5f, viewHalfW=viewHalfH*aspect;
-        cam.setFrustum(-1000f, 1000f, -viewHalfW, viewHalfW, -viewHalfH, viewHalfH);
+        cam.setFrustum(-1000f, 1000f, -viewHalfW, viewHalfW, viewHalfH, -viewHalfH);
     }
 
     private void setupLighting() {
