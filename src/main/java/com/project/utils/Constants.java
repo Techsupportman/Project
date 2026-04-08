@@ -49,11 +49,11 @@ public final class Constants {
     public static final float ENEMY_ATTACK_DAMAGE         = 1f;  // 1 heart
     public static final float ENEMY_ATTACK_COOLDOWN       = 1.0f;
     /** Collision half-extent for standard enemies. */
-    public static final float ENEMY_SIZE                  = 0.45f;
+    public static final float ENEMY_SIZE                  = 0.8f;
     /** Collision half-extent for mini-bosses. */
-    public static final float MINI_BOSS_SIZE              = 0.75f;
+    public static final float MINI_BOSS_SIZE              = 1.6f;
     /** Collision half-extent for full bosses. */
-    public static final float BOSS_SIZE                   = 1.20f;
+    public static final float BOSS_SIZE                   = 3.5f;
     public static final int   ENEMY_SCORE_VALUE           = 10;
 
     // -------------------------------------------------------------------------

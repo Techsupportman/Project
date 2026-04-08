@@ -12,6 +12,7 @@ import com.project.entities.EnemyType;
 import com.project.entities.Pickup;
 import com.project.entities.Player;
 import com.project.entities.Projectile;
+import com.project.levels.BossArena;
 import com.project.levels.Level1;
 import com.project.levels.LevelManager;
 import com.project.systems.AISystem;
@@ -71,6 +72,9 @@ public class GameApp extends SimpleApplication {
     private List<Upgrade>  currentUpgradeChoices;
     private final Random   random     = new Random();
     private boolean        fireLocked = false;
+
+    /** Active boss arena — non-null only while a full boss is alive. */
+    private BossArena bossArena = null;
 
     private static final float BLACK_HOLE_BASE_SPEW_INTERVAL = 0.15f;
 
@@ -243,6 +247,8 @@ public class GameApp extends SimpleApplication {
         blackHoleRecordTimer = 0f; blackHoleSpewTimer = 0f;
         blackHoleStack.clear();
 
+        if (bossArena != null) { bossArena.destroy(rootNode); bossArena = null; }
+
         fireLocked = false;
         uiManager.setFireLockStatus(false);
 
@@ -275,6 +281,13 @@ public class GameApp extends SimpleApplication {
         }
         player.move(dx, dz, tpf);
 
+        // Clamp player inside boss arena ring during a boss encounter
+        if (bossArena != null) {
+            float[] clamped = bossArena.clampToArena(
+                    player.getPosition().x, player.getPosition().z);
+            player.setPosition(clamped[0], clamped[1]);
+        }
+
         // Camera follows player
         cam.setLocation(new Vector3f(
                 player.getPosition().x, Constants.CAMERA_HEIGHT, player.getPosition().z));
@@ -284,12 +297,14 @@ public class GameApp extends SimpleApplication {
         player.updateAim(wc[0], wc[1]);
         player.update(tpf);
 
+        uiManager.updateCrosshair(screenCursor.x, screenCursor.y);
+
         if (inputHandler.isFireHeld() || fireLocked) {
             if (player.tryFire()) spawnProjectiles();
         }
 
         // Player projectiles vs enemies
-        projectileSystem.update(projectiles, enemies, tpf);
+        projectileSystem.update(projectiles, enemies, tpf, rootNode);
 
         // Enemy projectiles vs player
         updateEnemyProjectiles(tpf);
@@ -299,7 +314,14 @@ public class GameApp extends SimpleApplication {
         for (Enemy e : newEnemies) {
             enemies.add(e);
             rootNode.attachChild(e.getNode());
-            if (e.getEnemyType().isBoss) uiManager.showBossWarning(e.getEnemyType().displayName);
+            if (e.getEnemyType().isBoss) {
+                uiManager.showBossWarning(e.getEnemyType().displayName);
+                // Seal the area: create boss arena centred on the player
+                if (bossArena == null) {
+                    bossArena = new BossArena(assetManager, rootNode,
+                            player.getPosition().x, player.getPosition().z);
+                }
+            }
         }
 
         Iterator<Enemy> it = enemies.iterator();
@@ -311,6 +333,8 @@ public class GameApp extends SimpleApplication {
                 if (e.getEnemyType().isBoss) {
                     spawnManager.onBossDefeated();
                     uiManager.clearBossWarning();
+                    // Remove the arena ring now that the boss is dead
+                    if (bossArena != null) { bossArena.destroy(rootNode); bossArena = null; }
                     spawnPickup(e.getPosition().x, e.getPosition().z, Pickup.PickupType.HEART, 0);
                     spawnPickup(e.getPosition().x+0.8f, e.getPosition().z, Pickup.PickupType.MUTATION, 0);
                 }

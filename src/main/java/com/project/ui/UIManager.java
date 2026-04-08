@@ -172,6 +172,11 @@ public class UIManager {
         hud.updateWeaponSelectHover(mx, my);
     }
 
+    /** Updates the crosshair position to track the mouse cursor (screen-space). */
+    public void updateCrosshair(float mx, float my) {
+        hud.updateCrosshair(mx, my);
+    }
+
     // ------------------------------------------------------------------
     // Boss warning
     // ------------------------------------------------------------------

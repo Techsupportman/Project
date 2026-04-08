@@ -3,10 +3,14 @@ package com.project.ui;
 import com.jme3.asset.AssetManager;
 import com.jme3.font.BitmapFont;
 import com.jme3.font.BitmapText;
+import com.jme3.material.Material;
 import com.jme3.math.ColorRGBA;
+import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
+import com.jme3.scene.shape.Quad;
 import com.jme3.system.AppSettings;
+import com.project.assets.MaterialFactory;
 import com.project.core.GameState;
 import com.project.entities.Player;
 import com.project.weapons.WeaponStats;
@@ -22,8 +26,26 @@ public class HUD {
     private int screenW;
     private int screenH;
 
-    // Left-side HUD
-    private final BitmapText heartsText;
+    // ------------------------------------------------------------------
+    // Graphical heart icons (coloured Quads replace the old BitmapText
+    // ♥ display which is invisible in the default bitmap font).
+    // ------------------------------------------------------------------
+    private static final int   MAX_DISPLAY_HEARTS = 12;
+    private static final float HEART_SIZE         = 20f;
+    private static final float HEART_SPACING      = 25f;
+    private final Geometry[]   heartGeos          = new Geometry[MAX_DISPLAY_HEARTS];
+    private final Material     heartFullMat;
+    private final Material     heartEmptyMat;
+
+    // ------------------------------------------------------------------
+    // Crosshair (two thin Quads centred on the cursor)
+    // ------------------------------------------------------------------
+    private static final float CROSSHAIR_LEN       = 14f;
+    private static final float CROSSHAIR_THICKNESS = 2f;
+    private final Geometry     crosshairH;   // horizontal bar
+    private final Geometry     crosshairV;   // vertical bar
+
+    // Left-side HUD (text)
     private final BitmapText levelText;
     private final BitmapText expText;
     private final BitmapText creditsText;
@@ -73,8 +95,34 @@ public class HUD {
 
         BitmapFont font = assetManager.loadFont("Interface/Fonts/Default.fnt");
 
-        // ---- Left HUD ----
-        heartsText   = makeText(font, guiNode, 2.0f, new ColorRGBA(1f, 0.3f, 0.3f, 1f));
+        // ---- Heart icons (coloured Quads — reliable across all bitmap fonts) ----
+        heartFullMat  = MaterialFactory.createColorMaterial(assetManager,
+                new ColorRGBA(0.9f, 0.1f, 0.1f, 1f));
+        heartEmptyMat = MaterialFactory.createColorMaterial(assetManager,
+                new ColorRGBA(0.3f, 0.08f, 0.08f, 1f));
+        for (int i = 0; i < MAX_DISPLAY_HEARTS; i++) {
+            Geometry g = new Geometry("heart_" + i, new Quad(HEART_SIZE, HEART_SIZE));
+            g.setMaterial(heartEmptyMat);
+            guiNode.attachChild(g);
+            heartGeos[i] = g;
+        }
+
+        // ---- Crosshair (two thin Quads, hidden until PLAYING state) ----
+        Material xhairMat = MaterialFactory.createColorMaterial(assetManager,
+                new ColorRGBA(1f, 1f, 1f, 0.9f));
+        crosshairH = new Geometry("xhairH",
+                new Quad(CROSSHAIR_LEN * 2f, CROSSHAIR_THICKNESS));
+        crosshairH.setMaterial(xhairMat);
+        crosshairH.setCullHint(Spatial.CullHint.Always);
+        guiNode.attachChild(crosshairH);
+
+        crosshairV = new Geometry("xhairV",
+                new Quad(CROSSHAIR_THICKNESS, CROSSHAIR_LEN * 2f));
+        crosshairV.setMaterial(xhairMat);
+        crosshairV.setCullHint(Spatial.CullHint.Always);
+        guiNode.attachChild(crosshairV);
+
+        // ---- Left HUD (text) ----
         levelText    = makeText(font, guiNode, 1.4f, ColorRGBA.Yellow);
         expText      = makeText(font, guiNode, 1.2f, new ColorRGBA(0.4f, 1f, 0.5f, 1f));
         creditsText  = makeText(font, guiNode, 1.2f, new ColorRGBA(1f, 0.9f, 0.2f, 1f));
@@ -100,8 +148,7 @@ public class HUD {
         fireLockText.setText("");
         fireLockText.setLocalTranslation(10f, 50f, 0f);
 
-        // Placeholder text for correct first-frame sizing
-        heartsText.setText("♥♥♥");
+        // Initial text values for correct first-frame sizing
         levelText.setText("Lv 1");
         expText.setText("EXP: 0 / 100");
         creditsText.setText("Credits: 0");
@@ -188,13 +235,41 @@ public class HUD {
                        GameState state, float waveTimer,
                        boolean waitingForWave, float tpf) {
 
-        heartsText.setText(buildHearts(player.getHearts(), player.getMaxHearts()));
+        updateHeartDisplay(player.getHearts(), player.getMaxHearts());
         levelText.setText("Lv " + player.getLevel());
         expText.setText("EXP: " + player.getCurrentExp() + " / " + player.getExpToNextLevel()
                 + "  " + buildBar(player.getCurrentExp(), player.getExpToNextLevel(), 14));
         creditsText.setText("Credits: " + player.getCredits());
         scoreText.setText("Score: " + score);
         layoutRightColumn();
+
+        // Show crosshair only while actively playing
+        boolean playing = (state == GameState.PLAYING);
+        crosshairH.setCullHint(playing ? Spatial.CullHint.Never : Spatial.CullHint.Always);
+        crosshairV.setCullHint(playing ? Spatial.CullHint.Never : Spatial.CullHint.Always);
+    }
+
+    /**
+     * Updates the crosshair position to follow the mouse cursor.
+     * Coordinates are in jME screen space (Y=0 at bottom).
+     */
+    public void updateCrosshair(float mx, float my) {
+        crosshairH.setLocalTranslation(mx - CROSSHAIR_LEN, my - CROSSHAIR_THICKNESS * 0.5f, 1f);
+        crosshairV.setLocalTranslation(mx - CROSSHAIR_THICKNESS * 0.5f, my - CROSSHAIR_LEN, 1f);
+    }
+
+    // ------------------------------------------------------------------
+    // Heart icon update
+    // ------------------------------------------------------------------
+    private void updateHeartDisplay(int current, int max) {
+        for (int i = 0; i < MAX_DISPLAY_HEARTS; i++) {
+            if (i < max) {
+                heartGeos[i].setMaterial(i < current ? heartFullMat : heartEmptyMat);
+                heartGeos[i].setCullHint(Spatial.CullHint.Never);
+            } else {
+                heartGeos[i].setCullHint(Spatial.CullHint.Always);
+            }
+        }
     }
 
     /** Refreshes the elapsed-time indicator (call each frame). */
@@ -397,8 +472,8 @@ public class HUD {
 
     private void refreshVolumeText() {
         int filled = masterVolumePct / 10;
-        String bar = "█".repeat(filled) + "░".repeat(10 - filled);
-        volumeText.setText("Volume:  " + bar + "  " + masterVolumePct + "%");
+        String bar = "#".repeat(filled) + "-".repeat(10 - filled);
+        volumeText.setText("Volume:  [" + bar + "]  " + masterVolumePct + "%");
         centreText(volumeText, screenH * 0.60f);
     }
 
@@ -472,12 +547,17 @@ public class HUD {
     }
 
     private void layoutStaticElements() {
-        float lineH  = heartsText.getSize() * 1.6f;
-        float startY = screenH - 14f;
-        heartsText.setLocalTranslation(12f, startY, 0f);
-        levelText.setLocalTranslation(12f, startY - lineH, 0f);
-        expText.setLocalTranslation(12f, startY - lineH * 1.8f, 0f);
-        creditsText.setLocalTranslation(12f, startY - lineH * 2.6f, 0f);
+        // Heart icon row at the top-left
+        float heartRowY = screenH - 12f;
+        for (int i = 0; i < MAX_DISPLAY_HEARTS; i++) {
+            heartGeos[i].setLocalTranslation(12f + i * HEART_SPACING, heartRowY - HEART_SIZE, 0f);
+        }
+
+        float textStartY = heartRowY - HEART_SIZE - 6f;
+        float lineH      = levelText.getSize() * 1.6f;
+        levelText.setLocalTranslation(12f, textStartY, 0f);
+        expText.setLocalTranslation(12f, textStartY - lineH, 0f);
+        creditsText.setLocalTranslation(12f, textStartY - lineH * 1.8f, 0f);
         layoutRightColumn();
     }
 
@@ -511,14 +591,6 @@ public class HUD {
         float lw = t.getLineWidth();
         float x  = lw > 0f ? Math.max(0f, (screenW - lw) * 0.5f) : screenW * 0.5f - 100f;
         t.setLocalTranslation(x, y, 0f);
-    }
-
-    private String buildHearts(int current, int max) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < max; i++) {
-            sb.append(i < current ? "♥" : "♡");
-        }
-        return sb.toString();
     }
 
     private String buildBar(float value, float max, int width) {

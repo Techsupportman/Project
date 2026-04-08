@@ -1,5 +1,6 @@
 package com.project.systems;
 
+import com.jme3.scene.Node;
 import com.project.entities.Enemy;
 import com.project.entities.Projectile;
 
@@ -23,19 +24,22 @@ public class ProjectileSystem {
 
     /**
      * Updates all projectiles and resolves their collisions with enemies.
+     * Inactive projectiles are removed from both the list and the scene graph.
      *
      * @param projectiles live projectile list (modified in-place)
      * @param enemies     active enemy list
      * @param tpf         seconds since last frame
+     * @param sceneRoot   scene node from which expired projectile nodes are detached
      * @return            total damage dealt this frame (for stat tracking)
      */
-    public float update(List<Projectile> projectiles, List<Enemy> enemies, float tpf) {
+    public float update(List<Projectile> projectiles, List<Enemy> enemies, float tpf, Node sceneRoot) {
         float totalDamage = 0f;
 
         Iterator<Projectile> pit = projectiles.iterator();
         while (pit.hasNext()) {
             Projectile proj = pit.next();
             if (!proj.isActive()) {
+                if (sceneRoot != null) sceneRoot.detachChild(proj.getNode());
                 pit.remove();
                 continue;
             }
@@ -43,6 +47,7 @@ public class ProjectileSystem {
             proj.update(tpf);
 
             if (!proj.isActive()) {
+                if (sceneRoot != null) sceneRoot.detachChild(proj.getNode());
                 pit.remove();
                 continue;
             }
@@ -94,10 +99,19 @@ public class ProjectileSystem {
             }
 
             if (!proj.isActive()) {
+                if (sceneRoot != null) sceneRoot.detachChild(proj.getNode());
                 pit.remove();
             }
         }
         return totalDamage;
+    }
+
+    /**
+     * Backward-compatible overload: updates projectiles without scene-graph cleanup.
+     * Prefer the 4-argument overload when a scene root is available.
+     */
+    public float update(List<Projectile> projectiles, List<Enemy> enemies, float tpf) {
+        return update(projectiles, enemies, tpf, null);
     }
 
     /** Returns the nearest active enemy to {@code proj} that is not {@code skip}, or null. */

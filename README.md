@@ -40,13 +40,14 @@ src/main/java/com/project/
 ├── ui/
 │   ├── Button.java            – Reusable button with translucent background + visible border outline
 │   ├── ButtonPanel.java       – Vertically-stacked array of Buttons with a panel background
-│   ├── HUD.java               – Hearts, level/EXP, credits, time, score; all menus and overlays
+│   ├── HUD.java               – Hearts (coloured Quad icons), level/EXP, credits, time, score; crosshair; all menus and overlays
 │   ├── UIManager.java         – Facade over HUD + LevelUpMenu
 │   └── LevelUpMenu.java       – Level-up overlay: 3-5 upgrade options, reroll, delete
 ├── levels/
 │   ├── Level.java             – Abstract base for all levels
 │   ├── LevelManager.java      – Load / unload / reload levels
-│   └── Level1.java            – The arena: dark floor and grid lines
+│   ├── Level1.java            – The arena: dark floor and grid lines
+│   └── BossArena.java         – Seals the play area during a boss: red danger floor + safe circle + ring wall
 ├── utils/
 │   ├── Constants.java         – All tunable numbers in one place
 │   ├── InputHandler.java      – Keyboard + mouse state (movement, fire, pause, fire-lock)
@@ -68,11 +69,13 @@ src/main/java/com/project/
 | **18 Weapon types** | Pistol → Rocket; each with unique damage / fire rate / pierce / ricochet / spread |
 | **Camera follows player** | Orthographic top-down camera tracks the player; no arena boundary clamp |
 | **Continuous spawning** | Time-based spawn manager: enemies appear around the player; spawn rate ramps up over time |
-| **8 standard enemy types** | Basic, Runner, Tank, Shooter, Swarm, Bruiser, Specter, Artillery |
+| **8 standard enemy types** | Basic, Runner, Tank, Shooter, Swarm, Bruiser, Specter, Artillery — all significantly larger than the player |
 | **Ranged enemies** | SHOOTER fires projectiles every 1.8 s within 8 units; ARTILLERY fires every 3 s within 14 units |
-| **Mini-bosses** | Alpha / Beta mini-bosses spawn every ~90 seconds |
-| **5 Bosses** | Colossus → Oblivion — one every 5 real minutes; normal spawning resumes after defeat |
-| **Heart-based HP** | Integer hearts on HUD (♥); 1 heart lost per contact or ranged hit |
+| **Mini-bosses** | Alpha / Beta mini-bosses spawn every ~90 seconds; visually larger than standard enemies |
+| **5 Bosses** | Colossus → Oblivion — one every 5 real minutes; very large; boss arena activates on spawn |
+| **Boss arena ring** | When a full boss spawns, a circle of red ring-wall segments seals the arena; the floor outside turns red; player movement is clamped inside; ring removed on boss defeat |
+| **Heart-based HP** | Integer hearts shown as coloured icons on the HUD; 1 heart lost per contact or ranged hit |
+| **Crosshair** | White + crosshair follows the mouse cursor during play |
 | **Ricochet** | Bullets with ricochet bounce off hit enemies toward the nearest other enemy |
 | **Pickups** | EXP orbs (auto-collected), Hearts, Mutations (boss drops) |
 | **EXP & Levelling** | Kill enemies to earn EXP; level up to choose upgrades |
