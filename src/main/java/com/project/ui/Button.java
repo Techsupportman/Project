@@ -13,21 +13,29 @@ import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Quad;
 
 /**
- * A reusable GUI button with a translucent Quad background and a centred
- * BitmapText label, rendered in the guiNode.
+ * A reusable GUI button with a translucent Quad background, a visible border
+ * outline, and a centred BitmapText label, all rendered in the guiNode.
  *
- * <p>Z-ordering: background at z=0, label at z=1.
+ * <p>Z-ordering: background at z=0, outline at z=0.5, label at z=1.
  */
 public class Button {
 
-    private static final ColorRGBA COLOR_BG_NORMAL   = new ColorRGBA(0.15f, 0.15f, 0.25f, 0.92f);
-    private static final ColorRGBA COLOR_BG_HOVER    = new ColorRGBA(0.35f, 0.35f, 0.60f, 0.97f);
-    private static final ColorRGBA COLOR_TEXT_NORMAL = ColorRGBA.White;
-    private static final ColorRGBA COLOR_TEXT_HOVER  = new ColorRGBA(1f, 1f, 0.3f, 1f);
+    private static final ColorRGBA COLOR_BG_NORMAL      = new ColorRGBA(0.15f, 0.15f, 0.25f, 0.92f);
+    private static final ColorRGBA COLOR_BG_HOVER       = new ColorRGBA(0.35f, 0.35f, 0.60f, 0.97f);
+    private static final ColorRGBA COLOR_TEXT_NORMAL    = ColorRGBA.White;
+    private static final ColorRGBA COLOR_TEXT_HOVER     = new ColorRGBA(1f, 1f, 0.3f, 1f);
+    private static final ColorRGBA COLOR_BORDER_NORMAL  = new ColorRGBA(0.55f, 0.55f, 0.80f, 1.0f);
+    private static final ColorRGBA COLOR_BORDER_HOVER   = new ColorRGBA(1.0f, 0.9f, 0.2f, 1.0f);
+    /** Thickness of the outline border in pixels. */
+    private static final float BORDER = 2f;
 
     private final Geometry   bgGeo;
     private final BitmapText label;
     private final Material   bgMat;
+
+    // Four border edge quads (top, bottom, left, right)
+    private final Geometry[] borderGeos = new Geometry[4];
+    private final Material[] borderMats = new Material[4];
 
     // Mutable so setPosition() works
     private float x, y;
@@ -63,6 +71,20 @@ public class Button {
         bgGeo.setLocalTranslation(x, y, 0f);
         guiNode.attachChild(bgGeo);
 
+        // Border outlines (z=0.5) — top, bottom, left, right
+        float[][] borderDims = calculateBorderDimensions();
+        for (int i = 0; i < 4; i++) {
+            Quad bq = new Quad(borderDims[i][2], borderDims[i][3]);
+            borderGeos[i] = new Geometry("btn-border-" + i, bq);
+            borderMats[i] = new Material(am, "Common/MatDefs/Misc/Unshaded.j3md");
+            borderMats[i].setColor("Color", COLOR_BORDER_NORMAL.clone());
+            borderMats[i].getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Alpha);
+            borderGeos[i].setMaterial(borderMats[i]);
+            borderGeos[i].setQueueBucket(RenderQueue.Bucket.Gui);
+            borderGeos[i].setLocalTranslation(borderDims[i][0], borderDims[i][1], 0.5f);
+            guiNode.attachChild(borderGeos[i]);
+        }
+
         // Label (z=1)
         label = new BitmapText(font, false);
         label.setSize(font.getCharSet().getRenderedSize() * 1.4f);
@@ -82,16 +104,20 @@ public class Button {
     public void show() {
         bgGeo.setCullHint(Spatial.CullHint.Never);
         label.setCullHint(Spatial.CullHint.Never);
+        for (Geometry g : borderGeos) g.setCullHint(Spatial.CullHint.Never);
     }
 
     public void hide() {
         bgGeo.setCullHint(Spatial.CullHint.Always);
         label.setCullHint(Spatial.CullHint.Always);
+        for (Geometry g : borderGeos) g.setCullHint(Spatial.CullHint.Always);
     }
 
     public void setHovered(boolean hovered) {
         bgMat.setColor("Color", hovered ? COLOR_BG_HOVER : COLOR_BG_NORMAL);
         label.setColor(hovered ? COLOR_TEXT_HOVER : COLOR_TEXT_NORMAL);
+        ColorRGBA borderColor = hovered ? COLOR_BORDER_HOVER : COLOR_BORDER_NORMAL;
+        for (Material m : borderMats) m.setColor("Color", borderColor);
     }
 
     /** Returns {@code true} when (mx, my) is within the button bounds. */
@@ -104,11 +130,12 @@ public class Button {
         centerLabel();
     }
 
-    /** Repositions both the background quad and the label. */
+    /** Repositions both the background quad, border, and the label. */
     public void setPosition(float nx, float ny) {
         this.x = nx;
         this.y = ny;
         bgGeo.setLocalTranslation(nx, ny, 0f);
+        repositionBorders();
         centerLabel();
     }
 
@@ -119,9 +146,24 @@ public class Button {
     private void centerLabel() {
         float lw = label.getLineWidth();
         float lh = label.getSize();
-        // Fallback to a small indent if getLineWidth() returns 0 before first render
         float lx = lw > 0f ? x + (w - lw) * 0.5f : x + 8f;
         float ly = y + h * 0.5f + lh * 0.35f;
         label.setLocalTranslation(lx, ly, 1f);
+    }
+
+    private float[][] calculateBorderDimensions() {
+        return new float[][] {
+            { x,              y + h - BORDER, w,     BORDER }, // top
+            { x,              y,              w,     BORDER }, // bottom
+            { x,              y,              BORDER, h     }, // left
+            { x + w - BORDER, y,              BORDER, h     }  // right
+        };
+    }
+
+    private void repositionBorders() {
+        float[][] dims = calculateBorderDimensions();
+        for (int i = 0; i < 4; i++) {
+            borderGeos[i].setLocalTranslation(dims[i][0], dims[i][1], 0.5f);
+        }
     }
 }

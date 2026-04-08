@@ -49,12 +49,40 @@ public final class Constants {
     public static final float ENEMY_ATTACK_DAMAGE         = 1f;  // 1 heart
     public static final float ENEMY_ATTACK_COOLDOWN       = 1.0f;
     /** Collision half-extent for standard enemies. */
-    public static final float ENEMY_SIZE                  = 0.45f;
+    public static final float ENEMY_SIZE                  = 0.8f;
     /** Collision half-extent for mini-bosses. */
-    public static final float MINI_BOSS_SIZE              = 0.75f;
+    public static final float MINI_BOSS_SIZE              = 1.6f;
     /** Collision half-extent for full bosses. */
-    public static final float BOSS_SIZE                   = 1.20f;
+    public static final float BOSS_SIZE                   = 3.5f;
     public static final int   ENEMY_SCORE_VALUE           = 10;
+
+    // -------------------------------------------------------------------------
+    // Enemy ranged attacks (SHOOTER type)
+    // -------------------------------------------------------------------------
+    /** Distance within which a SHOOTER will stop and fire. */
+    public static final float SHOOTER_FIRE_RANGE    = 8f;
+    /** Seconds between SHOOTER shots. */
+    public static final float SHOOTER_FIRE_INTERVAL = 1.8f;
+    /** Bullet travel speed for SHOOTER projectiles. */
+    public static final float SHOOTER_BULLET_SPEED  = 14f;
+    /** Damage (hearts) dealt by a SHOOTER bullet. */
+    public static final float SHOOTER_BULLET_DAMAGE = 0.5f;
+    /** Visual/collision radius for SHOOTER bullets. */
+    public static final float SHOOTER_BULLET_SIZE   = 0.12f;
+
+    // -------------------------------------------------------------------------
+    // Enemy ranged attacks (ARTILLERY type)
+    // -------------------------------------------------------------------------
+    /** Distance within which an ARTILLERY enemy will stop and fire. */
+    public static final float ARTILLERY_FIRE_RANGE    = 14f;
+    /** Seconds between ARTILLERY shots. */
+    public static final float ARTILLERY_FIRE_INTERVAL = 3.0f;
+    /** Bullet travel speed for ARTILLERY projectiles. */
+    public static final float ARTILLERY_BULLET_SPEED  = 10f;
+    /** Damage (hearts) dealt by an ARTILLERY shell. */
+    public static final float ARTILLERY_BULLET_DAMAGE = 1.0f;
+    /** Visual/collision radius for ARTILLERY shells. */
+    public static final float ARTILLERY_BULLET_SIZE   = 0.20f;
 
     // -------------------------------------------------------------------------
     // Wave / Spawning (time-based continuous system)

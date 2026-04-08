@@ -20,8 +20,8 @@ public class Projectile extends GameObject {
     // ------------------------------------------------------------------
     // Movement
     // ------------------------------------------------------------------
-    private final float dirX;
-    private final float dirZ;
+    private float dirX;
+    private float dirZ;
     private final float speed;
 
     // ------------------------------------------------------------------
@@ -31,12 +31,12 @@ public class Projectile extends GameObject {
     private int   pierceRemaining;
     private int   ricochetRemaining;
 
-    /** World-unit half-extents of the arena boundary for ricochet clamping. */
-    private final float arenaHalfW;
-    private final float arenaHalfH;
-
-    /** Maximum flight distance before the bullet despawns (prevents infinite travel). */
-    private static final float MAX_RANGE = 50f;
+    /**
+     * Maximum flight distance before the bullet despawns.
+     * Increased from 50f since there are no arena walls and the camera
+     * follows the player, so bullets need a longer travel range.
+     */
+    private static final float MAX_RANGE = 80f;
     private float distanceTravelled = 0f;
 
     // ------------------------------------------------------------------
@@ -52,9 +52,46 @@ public class Projectile extends GameObject {
      * @param damage        damage dealt to each enemy hit
      * @param bulletSize    visual and collision radius
      * @param pierce        number of enemies the bullet can pass through
-     * @param ricochet      number of wall bounces allowed
-     * @param arenaHalfW    arena half-width for bounce detection
-     * @param arenaHalfH    arena half-height for bounce detection
+     * @param ricochet      number of enemy bounces allowed
+     * @param color         visual colour of the bullet placeholder
+     */
+    public Projectile(AssetManager assetManager,
+                      float x, float z,
+                      float dirX, float dirZ,
+                      float speed, float damage,
+                      float bulletSize,
+                      int   pierce, int ricochet,
+                      ColorRGBA color) {
+        super(x, z, bulletSize);
+        this.dirX              = dirX;
+        this.dirZ              = dirZ;
+        this.speed             = speed;
+        this.damage            = damage;
+        this.pierceRemaining   = pierce;
+        this.ricochetRemaining = ricochet;
+
+        node.attachChild(PlaceholderGenerator.createPlaceholderNode(
+                assetManager, "BULLET", bulletSize, bulletSize, color));
+    }
+
+    /**
+     * Creates a player bullet with the default bright-yellow colour.
+     */
+    public Projectile(AssetManager assetManager,
+                      float x, float z,
+                      float dirX, float dirZ,
+                      float speed, float damage,
+                      float bulletSize,
+                      int   pierce, int ricochet) {
+        this(assetManager, x, z, dirX, dirZ, speed, damage, bulletSize, pierce, ricochet,
+             new ColorRGBA(1.0f, 1.0f, 0.2f, 1.0f)); // bright yellow
+    }
+
+    /**
+     * Legacy constructor kept for backward compatibility.
+     * The arenaHalfW and arenaHalfH parameters are no longer used (wall-bounce
+     * is replaced by enemy ricochet), but the signature is preserved so
+     * existing callers compile without change.
      */
     public Projectile(AssetManager assetManager,
                       float x, float z,
@@ -63,24 +100,7 @@ public class Projectile extends GameObject {
                       float bulletSize,
                       int   pierce, int ricochet,
                       float arenaHalfW, float arenaHalfH) {
-        super(x, z, bulletSize);
-        this.dirX              = dirX;
-        this.dirZ              = dirZ;
-        this.speed             = speed;
-        this.damage            = damage;
-        this.pierceRemaining   = pierce;
-        this.ricochetRemaining = ricochet;
-        this.arenaHalfW        = arenaHalfW;
-        this.arenaHalfH        = arenaHalfH;
-
-        // Placeholder: small yellow box labelled "BULLET"
-        node.attachChild(PlaceholderGenerator.createPlaceholderNode(
-                assetManager,
-                "BULLET",
-                bulletSize,
-                bulletSize,
-                new ColorRGBA(1.0f, 1.0f, 0.2f, 1.0f) // bright yellow
-        ));
+        this(assetManager, x, z, dirX, dirZ, speed, damage, bulletSize, pierce, ricochet);
     }
 
     // ------------------------------------------------------------------
@@ -99,31 +119,6 @@ public class Projectile extends GameObject {
             return;
         }
 
-        // Wall bounce
-        if (ricochetRemaining > 0) {
-            boolean bounced = false;
-            if (Math.abs(newX) >= arenaHalfW) {
-                newX = Math.signum(newX) * (arenaHalfW - 0.01f);
-                // The direction is reversed in the X component; since dirX/Z are
-                // final we cannot reassign, so we mark inactive after bounce.
-                // For a full ricochet the caller should create a new projectile
-                // travelling in the reflected direction.
-                ricochetRemaining--;
-                active = false; // simplified: deactivate and let SpawnManager create reflected bullet
-                bounced = true;
-            }
-            if (!bounced && Math.abs(newZ) >= arenaHalfH) {
-                ricochetRemaining--;
-                active = false;
-            }
-        } else {
-            // No ricochet: deactivate if it leaves the arena
-            if (Math.abs(newX) >= arenaHalfW || Math.abs(newZ) >= arenaHalfH) {
-                active = false;
-                return;
-            }
-        }
-
         setPosition(newX, newZ);
     }
 
@@ -132,16 +127,41 @@ public class Projectile extends GameObject {
     // ------------------------------------------------------------------
     /**
      * Called when this projectile hits an enemy.
-     * Decrements pierce; deactivates when pierce runs out.
+     *
+     * <p>If the projectile has ricochet remaining it does <em>not</em> consume
+     * pierce — instead the caller is expected to call {@link #applyRicochet}
+     * with the reflected direction.  Otherwise, pierce is decremented and the
+     * projectile deactivates when pierce runs out.
      *
      * @return damage to deal to the enemy
      */
     public float onHit() {
+        if (ricochetRemaining > 0) {
+            // Ricochet takes priority — direction will be updated by caller via applyRicochet()
+            return damage;
+        }
         pierceRemaining--;
         if (pierceRemaining < 0) {
             active = false;
         }
         return damage;
+    }
+
+    /**
+     * Reflects the projectile's direction and decrements the ricochet counter.
+     * The projectile is also nudged forward by one bullet-size so that it
+     * immediately separates from the enemy it just bounced off.
+     *
+     * @param newDirX normalised reflected X direction
+     * @param newDirZ normalised reflected Z direction
+     */
+    public void applyRicochet(float newDirX, float newDirZ) {
+        this.dirX = newDirX;
+        this.dirZ = newDirZ;
+        this.ricochetRemaining--;
+        // Nudge forward so the projectile doesn't instantly re-hit the same enemy
+        setPosition(position.x + newDirX * size * 2f,
+                    position.z + newDirZ * size * 2f);
     }
 
     // ------------------------------------------------------------------
@@ -151,6 +171,8 @@ public class Projectile extends GameObject {
     public float getDirZ()  { return dirZ; }
     public float getDamage(){ return damage; }
     public int   getRicochetRemaining() { return ricochetRemaining; }
+
+    // Legacy reflection helpers — kept for any existing callers
     public Vector2D getReflectedDirX_Wall()  { return new Vector2D(-dirX,  dirZ); }
     public Vector2D getReflectedDirZ_Wall()  { return new Vector2D( dirX, -dirZ); }
 }

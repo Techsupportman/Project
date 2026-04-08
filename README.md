@@ -13,41 +13,44 @@ src/main/java/com/project/
 │   ├── Main.java              – Entry point; configures AppSettings and starts GameApp
 │   ├── GameApp.java           – jMonkey SimpleApplication; owns all systems and the game loop
 │   ├── GameEngine.java        – Score, credits, time tracking, difficulty-scaled kills
-│   └── GameState.java         – Enum: DIFFICULTY_SELECT | PLAYING | PAUSED | LEVEL_UP | GAME_OVER
+│   └── GameState.java         – Enum: DIFFICULTY_SELECT | WEAPON_SELECT | PLAYING | PAUSED | SETTINGS | LEVEL_UP | GAME_OVER
 ├── difficulty/
 │   └── Difficulty.java        – Easy / Normal / Hard / Nightmare with per-tier stat multipliers
 ├── entities/
 │   ├── GameObject.java        – Abstract base: position, size, AABB collision, scene Node
 │   ├── Player.java            – Heart HP, ranged weapon, aim direction, EXP/level, credits
-│   ├── Enemy.java             – Multiple EnemyType variants
+│   ├── Enemy.java             – Multiple EnemyType variants; melee and ranged attack cooldowns
 │   ├── EnemyType.java         – 8 standard + 2 mini-bosses + 5 bosses with unlock times
-│   ├── Projectile.java        – Bullet: direction, speed, pierce, ricochet
+│   ├── Projectile.java        – Bullet: mutable direction, speed, pierce, enemy-ricochet
 │   └── Pickup.java            – Heart / EXP / Mutation collectible
 ├── weapons/
 │   ├── WeaponType.java        – 18 weapon types (Pistol → Rocket) with stat definitions
 │   ├── WeaponStats.java       – Damage, fire rate, bullet speed/size, pierce, ricochet, pellets
 │   └── Weapon.java            – Active weapon state: unlock status, fire-rate cooldown
 ├── systems/
-│   ├── AISystem.java          – Enemy direct-pursuit pathfinding + separation
+│   ├── AISystem.java          – Enemy pursuit + separation; SHOOTER/ARTILLERY fire ranged shots
 │   ├── CombatSystem.java      – Enemy contact damage (1 heart per hit)
 │   ├── PhysicsSystem.java     – AABB overlap resolution
-│   ├── ProjectileSystem.java  – Move bullets, test against enemies, apply pierce
-│   └── SpawnManager.java      – Time-based continuous spawning: standard → mini-boss → boss
+│   ├── ProjectileSystem.java  – Move bullets, enemy collision, ricochet bounce toward next enemy
+│   └── SpawnManager.java      – Time-based continuous spawning around the player; standard → mini-boss → boss
 ├── upgrades/
 │   ├── Upgrade.java           – Single upgrade node (id, parent, branch, name, magnitude)
 │   ├── UpgradeTree.java       – 7-node tree with exclusive A/B branching
 │   └── UpgradeManager.java    – 5 trees, generate choices, apply, reroll, delete
 ├── ui/
-│   ├── HUD.java               – Hearts, level/EXP, credits, time, score
+│   ├── Button.java            – Reusable button with translucent background + visible border outline
+│   ├── ButtonPanel.java       – Vertically-stacked array of Buttons with a panel background
+│   ├── HUD.java               – Hearts (coloured Quad icons), level/EXP, credits, time, score; crosshair; all menus and overlays
 │   ├── UIManager.java         – Facade over HUD + LevelUpMenu
 │   └── LevelUpMenu.java       – Level-up overlay: 3-5 upgrade options, reroll, delete
 ├── levels/
 │   ├── Level.java             – Abstract base for all levels
 │   ├── LevelManager.java      – Load / unload / reload levels
-│   └── Level1.java            – The arena: dark floor, grid lines, boundary walls
+│   ├── Level1.java            – The arena: dark floor and grid lines
+│   └── BossArena.java         – Seals the play area during a boss: red danger floor + safe circle + ring wall
 ├── utils/
 │   ├── Constants.java         – All tunable numbers in one place
-│   ├── InputHandler.java      – Keyboard + mouse state (movement, fire, choices)
+│   ├── InputHandler.java      – Keyboard + mouse state (movement, fire, pause, fire-lock)
 │   └── Vector2D.java          – Lightweight XZ-plane vector maths
 └── assets/
     ├── PlaceholderGenerator.java – Labelled coloured boxes (replace with real art later)
@@ -60,22 +63,30 @@ src/main/java/com/project/
 
 | Feature | Details |
 |---|---|
-| **Difficulty selection** | Easy (6 HP) / Normal (3 HP) / Hard / Nightmare — stat multipliers applied to all systems |
+| **Difficulty selection** | Easy / Normal / Hard / Nightmare — stat multipliers applied to all systems |
+| **Weapon selection** | Choose from all 18 weapons before starting; paginated mouse-driven menu |
 | **Ranged combat** | Left-click to fire toward the mouse cursor; weapon auto-fires while held |
-| **18 Weapon types** | Pistol → Rocket; chosen at game start; each has unique damage/fire rate/pierce/ricochet/spread |
-| **Continuous spawning** | Time-based spawn manager: faster spawns over time, new enemy types unlock at timed thresholds |
-| **8 standard enemy types** | Basic, Runner, Tank, Shooter, Swarm, Bruiser, Specter, Artillery |
-| **Mini-bosses** | Alpha / Beta mini-bosses spawn every ~90 seconds |
-| **5 Bosses** | Colossus → Oblivion — one every 5 real minutes; arena sealed during fight |
-| **Heart-based HP** | Integer hearts displayed on HUD (♥); 1 heart lost per contact hit |
+| **18 Weapon types** | Pistol → Rocket; each with unique damage / fire rate / pierce / ricochet / spread |
+| **Camera follows player** | Orthographic top-down camera tracks the player; no arena boundary clamp |
+| **Continuous spawning** | Time-based spawn manager: enemies appear around the player; spawn rate ramps up over time |
+| **8 standard enemy types** | Basic, Runner, Tank, Shooter, Swarm, Bruiser, Specter, Artillery — all significantly larger than the player |
+| **Ranged enemies** | SHOOTER fires projectiles every 1.8 s within 8 units; ARTILLERY fires every 3 s within 14 units |
+| **Mini-bosses** | Alpha / Beta mini-bosses spawn every ~90 seconds; visually larger than standard enemies |
+| **5 Bosses** | Colossus → Oblivion — one every 5 real minutes; very large; boss arena activates on spawn |
+| **Boss arena ring** | When a full boss spawns, a circle of red ring-wall segments seals the arena; the floor outside turns red; player movement is clamped inside; ring removed on boss defeat |
+| **Heart-based HP** | Integer hearts shown as coloured icons on the HUD; 1 heart lost per contact or ranged hit |
+| **Crosshair** | White + crosshair follows the mouse cursor during play |
+| **Ricochet** | Bullets with ricochet bounce off hit enemies toward the nearest other enemy |
 | **Pickups** | EXP orbs (auto-collected), Hearts, Mutations (boss drops) |
 | **EXP & Levelling** | Kill enemies to earn EXP; level up to choose upgrades |
 | **5 Upgrade trees** | Damage, Fire Rate, Vitality, Mobility, Piercing — 7 nodes each with exclusive A/B branches |
 | **Level-up menu** | 3–5 random options; one Reroll and one Delete available per level |
 | **Credits** | Accumulated as Score × 0.1; spend to unlock weapons |
 | **HUD** | Hearts, Lv/EXP bar, Credits, MM:SS timer, Score |
-| **Pause / Resume** | ESC key |
-| **Game Over / Restart** | Returns to difficulty select on R |
+| **Pause menu** | Resume / Restart / Settings / Quit |
+| **Settings** | Master volume slider (Vol − / Vol +) applied in real time |
+| **Button outlines** | All UI buttons have a visible border (silver → gold on hover) |
+| **Game Over / Restart** | Click "Restart" to return to difficulty select |
 | **Unit tests** | 34 tests covering engine, weapons, upgrades, difficulty, vector maths |
 
 ---
@@ -88,10 +99,9 @@ src/main/java/com/project/
 | **Left Mouse Button** (hold) | Fire active weapon toward cursor |
 | Q | Toggle Fire-Lock (auto-fire) |
 | ESC | Pause / Resume |
-| R | Restart (when Game Over) |
-| 1 – 5 | Choose upgrade in level-up menu |
-| F | Reroll upgrade choices (once per level) |
-| G | Skip / Delete upgrade (once per level) |
+| **Mouse click** | All menu interactions (difficulty, weapon, pause, level-up, game over) |
+
+> Number keys 1–5, F, G, E, K are no longer used — all menus are fully mouse-driven.
 
 ---
 
@@ -103,9 +113,9 @@ All visuals are placeholder flat boxes with a BitmapText label.  To swap in real
 |---|---|---|
 | `PLAYER` | `Player.java` constructor | Player sprite sheet / model |
 | `BASIC`, `RUNNER`, etc. | `Enemy.java` `colorFor()` | Enemy sprite variants |
-| `BULLET` | `Projectile.java` constructor | Bullet sprites per weapon type |
+| `BULLET` | `Projectile.java` constructor (yellow = player, orange-red = enemy) | Bullet sprites per weapon type |
 | `HEART`, `EXP`, `MUTATION` | `Pickup.java` constructor | Pickup sprites |
-| Floor / walls | `Level1.java` | Tile-map or environment model |
+| Floor | `Level1.java` | Tile-map or environment model |
 
 ---
 
@@ -140,8 +150,10 @@ mvn test
   [jMonkeyEngine SDK](https://github.com/jMonkeyEngine/sdk/releases), open
   the project as a *Maven project* — the `nbactions.xml` file provides the
   Run / Debug / Test action bindings required by the SDK.
-* All game constants (speed, health, vision radii, spawn intervals, etc.) live in
+* All game constants (speed, health, spawn intervals, enemy fire ranges, etc.) live in
   `com.project.utils.Constants` — edit that file to tune balance.
 * Weapon unlock costs and all 18 weapon stat definitions are in
   `com.project.weapons.WeaponType`.
+* There are no arena boundary walls — the camera follows the player freely.
+  Enemies spawn off-screen around the player's current position.
 

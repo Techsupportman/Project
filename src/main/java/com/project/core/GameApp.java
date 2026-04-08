@@ -12,6 +12,7 @@ import com.project.entities.EnemyType;
 import com.project.entities.Pickup;
 import com.project.entities.Player;
 import com.project.entities.Projectile;
+import com.project.levels.BossArena;
 import com.project.levels.Level1;
 import com.project.levels.LevelManager;
 import com.project.systems.AISystem;
@@ -52,6 +53,7 @@ public class GameApp extends SimpleApplication {
     private Player           player;
     private List<Enemy>      enemies;
     private List<Projectile> projectiles;
+    private List<Projectile> enemyProjectiles;
     private List<Pickup>     pickups;
 
     private AISystem         aiSystem;
@@ -70,7 +72,9 @@ public class GameApp extends SimpleApplication {
     private List<Upgrade>  currentUpgradeChoices;
     private final Random   random     = new Random();
     private boolean        fireLocked = false;
-    private boolean        isFullscreen = false;
+
+    /** Active boss arena — non-null only while a full boss is alive. */
+    private BossArena bossArena = null;
 
     private static final float BLACK_HOLE_BASE_SPEW_INTERVAL = 0.15f;
 
@@ -114,9 +118,10 @@ public class GameApp extends SimpleApplication {
         setupLighting();
         viewPort.setBackgroundColor(new ColorRGBA(0.08f, 0.08f, 0.12f, 1f));
 
-        enemies     = new ArrayList<>();
-        projectiles = new ArrayList<>();
-        pickups     = new ArrayList<>();
+        enemies          = new ArrayList<>();
+        projectiles      = new ArrayList<>();
+        enemyProjectiles = new ArrayList<>();
+        pickups          = new ArrayList<>();
 
         aiSystem         = new AISystem();
         combatSystem     = new CombatSystem();
@@ -226,10 +231,11 @@ public class GameApp extends SimpleApplication {
 
     // -- New game --
     private void startNewGame() {
-        for (Enemy e : enemies)          rootNode.detachChild(e.getNode());
-        for (Projectile p : projectiles) rootNode.detachChild(p.getNode());
-        for (Pickup pk : pickups)        rootNode.detachChild(pk.getNode());
-        enemies.clear(); projectiles.clear(); pickups.clear();
+        for (Enemy e : enemies)              rootNode.detachChild(e.getNode());
+        for (Projectile p : projectiles)     rootNode.detachChild(p.getNode());
+        for (Projectile p : enemyProjectiles) rootNode.detachChild(p.getNode());
+        for (Pickup pk : pickups)            rootNode.detachChild(pk.getNode());
+        enemies.clear(); projectiles.clear(); enemyProjectiles.clear(); pickups.clear();
         if (player != null) rootNode.detachChild(player.getNode());
 
         gameEngine.setDifficulty(difficulty);
@@ -240,6 +246,8 @@ public class GameApp extends SimpleApplication {
         blackHoleActive = false; blackHoleSpewing = false;
         blackHoleRecordTimer = 0f; blackHoleSpewTimer = 0f;
         blackHoleStack.clear();
+
+        if (bossArena != null) { bossArena.destroy(rootNode); bossArena = null; }
 
         fireLocked = false;
         uiManager.setFireLockStatus(false);
@@ -273,22 +281,47 @@ public class GameApp extends SimpleApplication {
         }
         player.move(dx, dz, tpf);
 
+        // Clamp player inside boss arena ring during a boss encounter
+        if (bossArena != null) {
+            float[] clamped = bossArena.clampToArena(
+                    player.getPosition().x, player.getPosition().z);
+            player.setPosition(clamped[0], clamped[1]);
+        }
+
+        // Camera follows player
+        cam.setLocation(new Vector3f(
+                player.getPosition().x, Constants.CAMERA_HEIGHT, player.getPosition().z));
+
         Vector2f screenCursor = inputHandler.getCursorPosition();
         float[] wc = screenToWorld(screenCursor.x, screenCursor.y);
         player.updateAim(wc[0], wc[1]);
         player.update(tpf);
 
+        uiManager.updateCrosshair(screenCursor.x, screenCursor.y);
+
         if (inputHandler.isFireHeld() || fireLocked) {
             if (player.tryFire()) spawnProjectiles();
         }
 
-        projectileSystem.update(projectiles, enemies, tpf);
+        // Player projectiles vs enemies
+        projectileSystem.update(projectiles, enemies, tpf, rootNode);
 
-        List<Enemy> newEnemies = spawnManager.update(tpf, assetManager, enemies.size());
+        // Enemy projectiles vs player
+        updateEnemyProjectiles(tpf);
+
+        List<Enemy> newEnemies = spawnManager.update(tpf, assetManager, enemies.size(),
+                player.getPosition().x, player.getPosition().z);
         for (Enemy e : newEnemies) {
             enemies.add(e);
             rootNode.attachChild(e.getNode());
-            if (e.getEnemyType().isBoss) uiManager.showBossWarning(e.getEnemyType().displayName);
+            if (e.getEnemyType().isBoss) {
+                uiManager.showBossWarning(e.getEnemyType().displayName);
+                // Seal the area: create boss arena centred on the player
+                if (bossArena == null) {
+                    bossArena = new BossArena(assetManager, rootNode,
+                            player.getPosition().x, player.getPosition().z);
+                }
+            }
         }
 
         Iterator<Enemy> it = enemies.iterator();
@@ -299,6 +332,9 @@ public class GameApp extends SimpleApplication {
                 onEnemyKilled(e);
                 if (e.getEnemyType().isBoss) {
                     spawnManager.onBossDefeated();
+                    uiManager.clearBossWarning();
+                    // Remove the arena ring now that the boss is dead
+                    if (bossArena != null) { bossArena.destroy(rootNode); bossArena = null; }
                     spawnPickup(e.getPosition().x, e.getPosition().z, Pickup.PickupType.HEART, 0);
                     spawnPickup(e.getPosition().x+0.8f, e.getPosition().z, Pickup.PickupType.MUTATION, 0);
                 }
@@ -307,6 +343,10 @@ public class GameApp extends SimpleApplication {
             e.update(tpf);
             aiSystem.update(e, player, tpf);
             combatSystem.enemyContactDamage(e, player, tpf);
+
+            // Ranged enemy shot
+            AISystem.EnemyShot shot = aiSystem.tryRangedShot(e, player, tpf);
+            if (shot != null) spawnEnemyProjectile(shot);
         }
 
         physicsSystem.resolveAll(enemies, player);
@@ -332,6 +372,38 @@ public class GameApp extends SimpleApplication {
         updateBlackHoleHud();
     }
 
+    /** Moves enemy projectiles and checks for collision with the player. */
+    private void updateEnemyProjectiles(float tpf) {
+        Iterator<Projectile> epit = enemyProjectiles.iterator();
+        while (epit.hasNext()) {
+            Projectile proj = epit.next();
+            if (!proj.isActive()) { rootNode.detachChild(proj.getNode()); epit.remove(); continue; }
+            proj.update(tpf);
+            if (!proj.isActive()) { rootNode.detachChild(proj.getNode()); epit.remove(); continue; }
+
+            float pdx = proj.getPosition().x - player.getPosition().x;
+            float pdz = proj.getPosition().z - player.getPosition().z;
+            float dist = (float) Math.sqrt(pdx * pdx + pdz * pdz);
+            if (dist <= proj.getSize() + Constants.PLAYER_SIZE) {
+                // Deal one heart of damage and deactivate the projectile
+                player.takeDamage();
+                proj.onHit(); // deactivates it
+                rootNode.detachChild(proj.getNode());
+                epit.remove();
+            }
+        }
+    }
+
+    /** Creates an enemy-fired projectile and adds it to the scene. */
+    private void spawnEnemyProjectile(AISystem.EnemyShot shot) {
+        Projectile proj = new Projectile(assetManager,
+                shot.x, shot.z, shot.dirX, shot.dirZ,
+                shot.speed, shot.damage, shot.size, 0, 0,
+                new ColorRGBA(1.0f, 0.4f, 0.1f, 1.0f)); // orange-red
+        enemyProjectiles.add(proj);
+        rootNode.attachChild(proj.getNode());
+    }
+
     // -- Pause --
     private void handlePausedInput() {
         Vector2f cursor = inputHandler.getCursorPosition();
@@ -353,7 +425,6 @@ public class GameApp extends SimpleApplication {
     private void enterSettings() {
         gameState = GameState.SETTINGS;
         uiManager.showSettingsMenu();
-        uiManager.setFullscreenLabel(isFullscreen);
     }
 
     private void handleSettingsInput() {
@@ -363,13 +434,9 @@ public class GameApp extends SimpleApplication {
         if (inputHandler.isLmbJustPressed()) {
             int clicked = uiManager.getSettingsClickedOption(cursor.x, cursor.y);
             switch (clicked) {
-                case 0 -> {
-                    isFullscreen = !isFullscreen;
-                    settings.setFullscreen(isFullscreen);
-                    uiManager.setFullscreenLabel(isFullscreen);
-                    restart();
-                }
-                case 1 -> leaveSettings();
+                case 0 -> { float vol = uiManager.adjustVolume(-10); getListener().setVolume(vol); }
+                case 1 -> { float vol = uiManager.adjustVolume(+10); getListener().setVolume(vol); }
+                case 2 -> leaveSettings();
             }
         }
     }
@@ -540,7 +607,10 @@ public class GameApp extends SimpleApplication {
         float w=settings.getWidth(), h=settings.getHeight();
         float aspect=w/h, viewHalfH=Constants.LEVEL_HALF_HEIGHT+1.5f, viewHalfW=viewHalfH*aspect;
         float ndcX=(screenX/w)*2f-1f, ndcY=(screenY/h)*2f-1f;
-        return new float[]{ndcX*viewHalfW, -ndcY*viewHalfH};
+        // Add camera offset so cursor world position follows the camera (which follows the player)
+        float camX = cam.getLocation().x;
+        float camZ = cam.getLocation().z;
+        return new float[]{camX + ndcX*viewHalfW, camZ - ndcY*viewHalfH};
     }
 
     // -- Scene setup --

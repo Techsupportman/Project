@@ -26,6 +26,7 @@ public class Enemy extends GameObject {
     private final float speed;
     private final float contactDamage;
     private float attackCooldown;
+    private float rangedCooldown;
 
     // ------------------------------------------------------------------
     // Constructor
@@ -38,6 +39,7 @@ public class Enemy extends GameObject {
         this.speed         = type.baseSpeed;
         this.contactDamage = Constants.ENEMY_ATTACK_DAMAGE * difficulty.enemyDamageMult;
         this.attackCooldown = 0f;
+        this.rangedCooldown = 0f;
 
         ColorRGBA color = colorFor(type);
         float     sz    = sizeFor(type);
@@ -59,9 +61,8 @@ public class Enemy extends GameObject {
     // ------------------------------------------------------------------
     @Override
     public void update(float tpf) {
-        if (attackCooldown > 0f) {
-            attackCooldown -= tpf;
-        }
+        if (attackCooldown > 0f)  attackCooldown  -= tpf;
+        if (rangedCooldown > 0f) rangedCooldown -= tpf;
     }
 
     // ------------------------------------------------------------------
@@ -69,7 +70,8 @@ public class Enemy extends GameObject {
     // ------------------------------------------------------------------
     /**
      * Moves the enemy by the supplied normalised direction vector scaled by
-     * this enemy's speed and delta-time.
+     * this enemy's speed and delta-time, without any arena-boundary clamping
+     * (the camera now follows the player and there are no walls).
      *
      * @param dx  X-axis direction component
      * @param dz  Z-axis direction component
@@ -78,12 +80,6 @@ public class Enemy extends GameObject {
     public void moveToward(float dx, float dz, float tpf) {
         float newX = position.x + dx * speed * tpf;
         float newZ = position.z + dz * speed * tpf;
-
-        float hw = Constants.LEVEL_HALF_WIDTH  - size;
-        float hh = Constants.LEVEL_HALF_HEIGHT - size;
-        newX = Math.max(-hw, Math.min(hw, newX));
-        newZ = Math.max(-hh, Math.min(hh, newZ));
-
         setPosition(newX, newZ);
     }
 
@@ -111,6 +107,16 @@ public class Enemy extends GameObject {
     /** Resets the attack cooldown after dealing damage to the player. */
     public void resetAttackCooldown() {
         attackCooldown = Constants.ENEMY_ATTACK_COOLDOWN;
+    }
+
+    /** @return {@code true} if this enemy's ranged-attack cooldown has expired. */
+    public boolean canRangedAttack() {
+        return rangedCooldown <= 0f;
+    }
+
+    /** Resets the ranged cooldown after firing a projectile. */
+    public void resetRangedCooldown(float interval) {
+        rangedCooldown = interval;
     }
 
     /** @return {@code true} when health has reached zero. */
