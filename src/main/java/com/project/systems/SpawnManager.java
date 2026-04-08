@@ -64,9 +64,12 @@ public class SpawnManager {
      * @param tpf          seconds since last frame
      * @param assetManager jME asset manager for enemy construction
      * @param currentCount number of enemies currently alive (throttle cap)
+     * @param playerX      player X position (enemies spawn around the player)
+     * @param playerZ      player Z position (enemies spawn around the player)
      * @return list of newly spawned enemies (may be empty)
      */
-    public List<Enemy> update(float tpf, AssetManager assetManager, int currentCount) {
+    public List<Enemy> update(float tpf, AssetManager assetManager, int currentCount,
+                              float playerX, float playerZ) {
         List<Enemy> spawned = new ArrayList<>();
         elapsedSeconds += tpf;
 
@@ -77,7 +80,7 @@ public class SpawnManager {
         if (bossIndex < BOSS_SPAWN_TIMES.length
                 && elapsedSeconds >= BOSS_SPAWN_TIMES[bossIndex]) {
             EnemyType bossType = bossTypeAt(bossIndex);
-            spawned.add(spawnAt(assetManager, bossType, 0f, 0f)); // boss spawns at center
+            spawned.add(spawnAt(assetManager, bossType, playerX, playerZ)); // boss spawns at player
             bossActive = true;
             bossIndex++;
             return spawned; // only spawn the boss this tick
@@ -90,7 +93,7 @@ public class SpawnManager {
                     ? EnemyType.MINI_BOSS_ALPHA
                     : EnemyType.MINI_BOSS_BETA;
             if (elapsedSeconds >= mbType.spawnAfterSeconds) {
-                float[] pos = randomEdgePosition();
+                float[] pos = randomEdgePosition(playerX, playerZ);
                 spawned.add(spawnAt(assetManager, mbType, pos[0], pos[1]));
                 return spawned;
             }
@@ -104,11 +107,18 @@ public class SpawnManager {
         while (spawnTimer >= baseInterval && currentCount + spawned.size() < Constants.MAX_ENEMIES_ALIVE) {
             spawnTimer -= baseInterval;
             EnemyType type = randomEnemyType();
-            float[] pos = randomEdgePosition();
+            float[] pos = randomEdgePosition(playerX, playerZ);
             spawned.add(spawnAt(assetManager, type, pos[0], pos[1]));
         }
 
         return spawned;
+    }
+
+    /**
+     * Legacy overload kept for backward compatibility — spawns around origin.
+     */
+    public List<Enemy> update(float tpf, AssetManager assetManager, int currentCount) {
+        return update(tpf, assetManager, currentCount, 0f, 0f);
     }
 
     /**
@@ -175,16 +185,16 @@ public class SpawnManager {
         return new Enemy(assetManager, x, z, type, difficulty);
     }
 
-    /** Returns a random position along one of the four arena edges. */
-    private float[] randomEdgePosition() {
+    /** Returns a random position along one of the four spawn edges around the player. */
+    private float[] randomEdgePosition(float playerX, float playerZ) {
         float hw = Constants.LEVEL_HALF_WIDTH  - 0.5f;
         float hh = Constants.LEVEL_HALF_HEIGHT - 0.5f;
         float x, z;
         switch (random.nextInt(4)) {
-            case 0  -> { x = -hw + random.nextFloat() * 2f * hw; z = -hh; }
-            case 1  -> { x = -hw + random.nextFloat() * 2f * hw; z =  hh; }
-            case 2  -> { x = -hw; z = -hh + random.nextFloat() * 2f * hh; }
-            default -> { x =  hw; z = -hh + random.nextFloat() * 2f * hh; }
+            case 0  -> { x = playerX + (-hw + random.nextFloat() * 2f * hw); z = playerZ - hh; }
+            case 1  -> { x = playerX + (-hw + random.nextFloat() * 2f * hw); z = playerZ + hh; }
+            case 2  -> { x = playerX - hw; z = playerZ + (-hh + random.nextFloat() * 2f * hh); }
+            default -> { x = playerX + hw; z = playerZ + (-hh + random.nextFloat() * 2f * hh); }
         }
         return new float[]{ x, z };
     }

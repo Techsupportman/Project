@@ -85,8 +85,7 @@ public class LevelUpMenu {
         for (int i = 0; i < MAX_CHOICES; i++) {
             if (i < choices.size()) {
                 Upgrade u = choices.get(i);
-                choiceTexts[i].setText("[" + (i + 1) + "]  " + u.name
-                        + "  —  " + u.description);
+                choiceTexts[i].setText(u.name + "  —  " + u.description);
                 centre(choiceTexts[i], screenH * (0.70f - i * 0.07f));
                 choiceTexts[i].setCullHint(com.jme3.scene.Spatial.CullHint.Never);
             } else {
@@ -97,18 +96,18 @@ public class LevelUpMenu {
 
         float bottomY = screenH * (0.70f - choices.size() * 0.07f) - 40f;
         rerollText.setText(rerollsLeft > 0
-                ? "[F]  Reroll choices  (" + rerollsLeft + " left)"
-                : "[F]  Reroll  (none left)");
+                ? "Reroll choices  (" + rerollsLeft + " left)"
+                : "Reroll  (none left)");
         centre(rerollText, bottomY);
         rerollText.setCullHint(com.jme3.scene.Spatial.CullHint.Never);
 
         deleteText.setText(deletesLeft > 0
-                ? "[G]  Skip / Delete  (" + deletesLeft + " left)"
-                : "[G]  Skip  (none left)");
+                ? "Skip / Delete  (" + deletesLeft + " left)"
+                : "Skip  (none left)");
         centre(deleteText, bottomY - rerollText.getSize() * 1.5f);
         deleteText.setCullHint(com.jme3.scene.Spatial.CullHint.Never);
 
-        visionHint.setText("Click or press 1-" + choices.size() + " to pick an upgrade");
+        visionHint.setText("Click to pick an upgrade");
         centre(visionHint, bottomY - rerollText.getSize() * 3.2f);
         visionHint.setCullHint(com.jme3.scene.Spatial.CullHint.Never);
 

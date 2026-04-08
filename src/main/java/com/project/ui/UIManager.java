@@ -89,9 +89,20 @@ public class UIManager {
         hud.updateSettingsHover(mx, my);
     }
 
-    public void setFullscreenLabel(boolean isFullscreen) {
-        hud.setFullscreenLabel(isFullscreen);
+    /**
+     * Adjusts the displayed volume by {@code delta} percent (±10) and returns
+     * the new 0–1 float volume for the audio listener.
+     */
+    public float adjustVolume(int delta) {
+        return hud.adjustVolume(delta);
     }
+
+    /** Returns the current master volume as a 0–1 float. */
+    public float getMasterVolume() { return hud.getMasterVolume(); }
+
+    /** @deprecated Fullscreen is no longer supported via settings. */
+    @Deprecated
+    public void setFullscreenLabel(boolean isFullscreen) { /* no-op */ }
 
     // ------------------------------------------------------------------
     // Fire lock
@@ -166,6 +177,11 @@ public class UIManager {
     // ------------------------------------------------------------------
     public void showBossWarning(String bossName) {
         hud.showBossWarning(bossName);
+    }
+
+    /** Clears the boss warning overlay after the boss has been defeated. */
+    public void clearBossWarning() {
+        hud.clearBossWarning();
     }
 
     // ------------------------------------------------------------------

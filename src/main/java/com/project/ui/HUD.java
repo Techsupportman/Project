@@ -48,9 +48,11 @@ public class HUD {
     // Pause menu panel (Resume / Restart / Settings / Quit)
     private final ButtonPanel pausePanel;
 
-    // Settings menu panel (Fullscreen toggle / Back)
+    // Settings menu panel (Volume Down / Volume Up / Back)
     private final BitmapText  settingsTitle;
+    private final BitmapText  volumeText;
     private final ButtonPanel settingsPanel;
+    private int masterVolumePct = 100; // 0–100
 
     // Weapon-select (up to 5 buttons + 2 nav buttons + title)
     private static final int MAX_WEAPON_BUTTONS = 5;
@@ -136,11 +138,15 @@ public class HUD {
         settingsTitle.setText("");
         settingsTitle.setCullHint(Spatial.CullHint.Always);
 
+        volumeText = makeText(font, guiNode, 1.5f, new ColorRGBA(0.6f, 1f, 0.6f, 1f));
+        volumeText.setText("");
+        volumeText.setCullHint(Spatial.CullHint.Always);
+
         settingsPanel = new ButtonPanel(
                 assetManager, guiNode, font,
-                screenW * 0.5f, screenH * 0.42f,
+                screenW * 0.5f, screenH * 0.38f,
                 320f, 52f, 14f,
-                "Fullscreen: OFF", "Back");
+                "Vol -", "Vol +", "Back");
 
         // ---- Weapon select ----
         weaponSelectTitle = makeText(font, guiNode, 2.2f,
@@ -163,10 +169,10 @@ public class HUD {
         float navBtnH = 44f;
         float navY    = wBtnStartY - MAX_WEAPON_BUTTONS * (wBtnH + wBtnSpacing) - 10f;
         weaponNavPrev = new Button(assetManager, guiNode, font,
-                "[G] Prev Page",
+                "< Prev",
                 screenW * 0.5f - navBtnW - 10f, navY, navBtnW, navBtnH);
         weaponNavNext = new Button(assetManager, guiNode, font,
-                "[F] Next Page",
+                "Next >",
                 screenW * 0.5f + 10f, navY, navBtnW, navBtnH);
 
         // ---- Game-over restart button ----
@@ -269,8 +275,8 @@ public class HUD {
                 WeaponType wt = pageWeapons[i];
                 WeaponStats s = wt.stats;
                 StringBuilder sb = new StringBuilder();
-                sb.append(String.format("[%d] %-20s  DMG:%-6.0f  RATE:%-5.1f  SPD:%.0f",
-                        i + 1, wt.displayName, s.damage, s.fireRate, s.bulletSpeed));
+                sb.append(String.format("%-22s  DMG:%-6.0f  RATE:%-5.1f  SPD:%.0f",
+                        wt.displayName, s.damage, s.fireRate, s.bulletSpeed));
                 if (s.pelletsPerShot > 1) {
                     sb.append(String.format("  x%d pellets", s.pelletsPerShot));
                 }
@@ -352,16 +358,20 @@ public class HUD {
         settingsTitle.setText("SETTINGS");
         centreText(settingsTitle, screenH * 0.68f);
         settingsTitle.setCullHint(Spatial.CullHint.Never);
+        refreshVolumeText();
+        volumeText.setCullHint(Spatial.CullHint.Never);
         settingsPanel.show();
     }
 
     public void hideSettingsMenu() {
         settingsTitle.setText("");
         settingsTitle.setCullHint(Spatial.CullHint.Always);
+        volumeText.setText("");
+        volumeText.setCullHint(Spatial.CullHint.Always);
         settingsPanel.hide();
     }
 
-    /** Returns 0=Fullscreen toggle, 1=Back, or -1. */
+    /** Returns 0=Volume Down, 1=Volume Up, 2=Back, or -1. */
     public int getSettingsClickedOption(float mx, float my) {
         return settingsPanel.getClickedButton(mx, my);
     }
@@ -370,10 +380,31 @@ public class HUD {
         settingsPanel.updateHover(mx, my);
     }
 
-    public void setFullscreenLabel(boolean isFullscreen) {
-        settingsPanel.getButton(0).setText(
-                isFullscreen ? "Fullscreen: ON" : "Fullscreen: OFF");
+    /**
+     * Adjusts the displayed volume by {@code delta} percent (clamped to 0–100)
+     * and refreshes the volume label.
+     *
+     * @return the new volume as a 0–1 float for the audio system
+     */
+    public float adjustVolume(int delta) {
+        masterVolumePct = Math.max(0, Math.min(100, masterVolumePct + delta));
+        refreshVolumeText();
+        return masterVolumePct / 100f;
     }
+
+    /** Returns the current master volume as a 0–1 float. */
+    public float getMasterVolume() { return masterVolumePct / 100f; }
+
+    private void refreshVolumeText() {
+        int filled = masterVolumePct / 10;
+        String bar = "█".repeat(filled) + "░".repeat(10 - filled);
+        volumeText.setText("Volume:  " + bar + "  " + masterVolumePct + "%");
+        centreText(volumeText, screenH * 0.60f);
+    }
+
+    /** @deprecated Use {@link #adjustVolume} instead; fullscreen is no longer supported. */
+    @Deprecated
+    public void setFullscreenLabel(boolean isFullscreen) { /* no-op */ }
 
     // ------------------------------------------------------------------
     // One-shot state methods
@@ -405,6 +436,12 @@ public class HUD {
         centerMessage.setText("!! BOSS -- " + bossName + " !!");
         subMessage.setText("Defeat the boss to resume normal spawning!");
         recenterMessage();
+    }
+
+    /** Clears the boss warning message from the screen. */
+    public void clearBossWarning() {
+        centerMessage.setText("");
+        subMessage.setText("");
     }
 
     public void reset() {

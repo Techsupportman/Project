@@ -110,8 +110,9 @@ public class Player extends GameObject {
     // ------------------------------------------------------------------
     /**
      * Translates the player by the given directional vector (already
-     * normalised for diagonals) scaled by speed and delta-time, then clamps
-     * the result inside the level bounds.
+     * normalised for diagonals) scaled by speed and delta-time.
+     * The player is no longer clamped to arena walls — the camera follows
+     * the player instead.
      *
      * @param dx  X-axis direction (−1 to +1)
      * @param dz  Z-axis direction (−1 to +1)
@@ -120,12 +121,6 @@ public class Player extends GameObject {
     public void move(float dx, float dz, float tpf) {
         float newX = position.x + dx * Constants.PLAYER_SPEED * tpf;
         float newZ = position.z + dz * Constants.PLAYER_SPEED * tpf;
-
-        float hw = Constants.LEVEL_HALF_WIDTH  - Constants.PLAYER_SIZE;
-        float hh = Constants.LEVEL_HALF_HEIGHT - Constants.PLAYER_SIZE;
-        newX = Math.max(-hw, Math.min(hw, newX));
-        newZ = Math.max(-hh, Math.min(hh, newZ));
-
         setPosition(newX, newZ);
     }
 
