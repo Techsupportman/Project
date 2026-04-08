@@ -13,9 +13,6 @@ import java.util.List;
 /**
  * Thin orchestration layer between {@link com.project.core.GameApp} and the
  * individual UI components.
- *
- * <p>Wraps {@link HUD} and {@link LevelUpMenu}.  Additional overlays (settings,
- * leaderboard, etc.) can be registered here without changing {@code GameApp}.
  */
 public class UIManager {
 
@@ -28,74 +25,136 @@ public class UIManager {
     }
 
     // ------------------------------------------------------------------
+    // Resize
+    // ------------------------------------------------------------------
+    public void onResize(int w, int h) {
+        hud.onResize(w, h);
+    }
+
+    // ------------------------------------------------------------------
     // HUD delegates
     // ------------------------------------------------------------------
-
     public void update(Player player, int score,
                        GameState state, float waveTimer,
                        boolean waitingForWave, float tpf) {
         hud.update(player, score, state, waveTimer, waitingForWave, tpf);
     }
 
-    /** @see HUD#update(Player, int, int, GameState, float, boolean, float) */
     public void update(Player player, int wave, int score,
                        GameState state, float waveTimer,
                        boolean waitingForWave, float tpf) {
         hud.update(player, wave, score, state, waveTimer, waitingForWave, tpf);
     }
 
-    /** Updates the elapsed-time display. Ignores the circleVision param (vision system removed). */
     public void updateTimeAndVision(float elapsedSeconds, boolean circleVision) {
         hud.updateElapsedTime(elapsedSeconds);
     }
 
-    /** @see HUD#setBlackHoleStatus(String) */
     public void setBlackHoleStatus(String statusText) {
         hud.setBlackHoleStatus(statusText);
     }
 
-    /** @see HUD#showPauseOverlay(boolean) */
+    // ------------------------------------------------------------------
+    // Pause menu
+    // ------------------------------------------------------------------
     public void showPauseOverlay(boolean show) {
         hud.showPauseOverlay(show);
     }
 
-    /** @see HUD#showGameOverOverlay(int) */
+    /** Returns 0=Resume, 1=Restart, 2=Settings, 3=Quit, or -1. */
+    public int getPauseMenuClickedOption(float mx, float my) {
+        return hud.getPauseMenuClickedOption(mx, my);
+    }
+
+    public void updatePauseMenuHover(float mx, float my) {
+        hud.updatePauseMenuHover(mx, my);
+    }
+
+    // ------------------------------------------------------------------
+    // Settings menu
+    // ------------------------------------------------------------------
+    public void showSettingsMenu() {
+        hud.showSettingsMenu();
+    }
+
+    public void hideSettingsMenu() {
+        hud.hideSettingsMenu();
+    }
+
+    public int getSettingsClickedOption(float mx, float my) {
+        return hud.getSettingsClickedOption(mx, my);
+    }
+
+    public void updateSettingsHover(float mx, float my) {
+        hud.updateSettingsHover(mx, my);
+    }
+
+    public void setFullscreenLabel(boolean isFullscreen) {
+        hud.setFullscreenLabel(isFullscreen);
+    }
+
+    // ------------------------------------------------------------------
+    // Fire lock
+    // ------------------------------------------------------------------
+    public void setFireLockStatus(boolean locked) {
+        hud.setFireLockStatus(locked);
+    }
+
+    // ------------------------------------------------------------------
+    // Game over
+    // ------------------------------------------------------------------
     public void showGameOverOverlay(int finalScore) {
         hud.showGameOverOverlay(finalScore);
     }
 
-    /** @see HUD#showDifficultySelect() */
+    // ------------------------------------------------------------------
+    // Difficulty select
+    // ------------------------------------------------------------------
     public void showDifficultySelect() {
         hud.showDifficultySelect();
     }
 
-    /** @see HUD#hideDifficultySelect() */
     public void hideDifficultySelect() {
         hud.hideDifficultySelect();
     }
 
-    /** @see HUD#showBossWarning(String) */
-    public void showBossWarning(String bossName) {
-        hud.showBossWarning(bossName);
+    public int getDifficultyClickedOption(float mx, float my) {
+        return hud.getDifficultyClickedOption(mx, my);
     }
 
-    /**
-     * Shows the weapon selection overlay for a specific page of weapons.
-     *
-     * @param pageWeapons weapons displayed on this page (up to 5)
-     * @param page        0-based page index
-     * @param totalPages  total number of pages
-     */
+    public void updateDifficultyHover(float mx, float my) {
+        hud.updateDifficultyHover(mx, my);
+    }
+
+    // ------------------------------------------------------------------
+    // Weapon select
+    // ------------------------------------------------------------------
     public void showWeaponSelect(WeaponType[] pageWeapons, int page, int totalPages) {
         hud.showWeaponSelect(pageWeapons, page, totalPages);
     }
 
-    /** Hides the weapon selection overlay. */
     public void hideWeaponSelect() {
         hud.hideWeaponSelect();
     }
 
-    /** @see HUD#reset() */
+    public int getWeaponClickedOption(float mx, float my) {
+        return hud.getWeaponClickedOption(mx, my);
+    }
+
+    public void updateWeaponSelectHover(float mx, float my) {
+        hud.updateWeaponSelectHover(mx, my);
+    }
+
+    // ------------------------------------------------------------------
+    // Boss warning
+    // ------------------------------------------------------------------
+    public void showBossWarning(String bossName) {
+        hud.showBossWarning(bossName);
+    }
+
+    // ------------------------------------------------------------------
+    // Reset
+    // ------------------------------------------------------------------
     public void reset() {
         hud.reset();
         levelUpMenu.hide();
@@ -104,28 +163,33 @@ public class UIManager {
     // ------------------------------------------------------------------
     // LevelUpMenu delegates
     // ------------------------------------------------------------------
-
-    /**
-     * Shows the level-up upgrade selection menu.
-     *
-     * @param newLevel    level just reached
-     * @param choices     list of upgrade choices (3-5)
-     * @param rerollsLeft remaining rerolls this level
-     * @param deletesLeft remaining deletes this level
-     */
     public void showLevelUpMenu(int newLevel, List<Upgrade> choices,
                                 int rerollsLeft, int deletesLeft) {
         levelUpMenu.show(newLevel, choices, rerollsLeft, deletesLeft);
     }
 
-    /** Hides the level-up menu. */
     public void hideLevelUpMenu() {
         levelUpMenu.hide();
     }
 
-    /** @return {@code true} when the level-up menu is currently displayed. */
     public boolean isLevelUpMenuVisible() {
         return levelUpMenu.isVisible();
+    }
+
+    public void updateLevelUpHover(float mx, float my, int activeChoices) {
+        levelUpMenu.updateHover(mx, my, activeChoices);
+    }
+
+    public int getLevelUpClickedChoice(float mx, float my, int activeChoices) {
+        return levelUpMenu.getClickedChoice(mx, my, activeChoices);
+    }
+
+    public boolean isLevelUpRerollClicked(float mx, float my) {
+        return levelUpMenu.isRerollClicked(mx, my);
+    }
+
+    public boolean isLevelUpDeleteClicked(float mx, float my) {
+        return levelUpMenu.isDeleteClicked(mx, my);
     }
 
     // ------------------------------------------------------------------
@@ -135,7 +199,7 @@ public class UIManager {
     public LevelUpMenu getLevelUpMenu() { return levelUpMenu; }
 
     // ------------------------------------------------------------------
-    // Legacy stub kept for backward compatibility
+    // Legacy stub
     // ------------------------------------------------------------------
-    public void showWaveAnnouncement(String text) { /* no-op in new system */ }
+    public void showWaveAnnouncement(String text) { /* no-op */ }
 }

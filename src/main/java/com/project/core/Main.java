@@ -27,6 +27,7 @@ public class Main {
         settings.setFrameRate(Constants.TARGET_FPS);
         settings.setVSync(true);
         settings.setSamples(4); // 4× MSAA for smoother edges
+        settings.setResizable(true);
 
         app.setSettings(settings);
         app.setShowSettings(false); // skip the display-settings dialog on startup

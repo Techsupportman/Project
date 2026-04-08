@@ -5,6 +5,7 @@ import com.jme3.font.BitmapFont;
 import com.jme3.font.BitmapText;
 import com.jme3.math.ColorRGBA;
 import com.jme3.scene.Node;
+import com.jme3.scene.Spatial;
 import com.jme3.system.AppSettings;
 import com.project.core.GameState;
 import com.project.entities.Player;
@@ -14,23 +15,12 @@ import com.project.weapons.WeaponType;
 /**
  * Heads-Up Display rendered in 2-D screen space (attached to
  * {@code guiNode}).
- *
- * <p>Elements displayed:
- * <ul>
- *   <li><b>Hearts</b> — top-left, one symbol per HP</li>
- *   <li><b>Level / EXP bar</b> — below hearts</li>
- *   <li><b>Credits</b> — below level</li>
- *   <li><b>Time elapsed</b> — top-right</li>
- *   <li><b>Score</b> — below time</li>
- *   <li><b>Black Hole status</b> — below score (when active)</li>
- *   <li><b>Centre message</b> — used for PAUSED, GAME OVER banners</li>
- *   <li><b>Controls hint</b> — bottom of screen</li>
- * </ul>
  */
 public class HUD {
 
-    private final int screenW;
-    private final int screenH;
+    // Screen dimensions — non-final so onResize() can update them
+    private int screenW;
+    private int screenH;
 
     // Left-side HUD
     private final BitmapText heartsText;
@@ -43,17 +33,34 @@ public class HUD {
     private final BitmapText scoreText;
     private final BitmapText blackHoleText;
 
-    // Centre overlays
+    // Centre overlays (GAME OVER, boss warning, etc.)
     private final BitmapText centerMessage;
     private final BitmapText subMessage;
 
-    // Weapon select overlay
-    private final BitmapText weaponSelectTitle;
-    private final BitmapText weaponSelectOptions;
-    private final BitmapText weaponSelectNav;
-
-    // Bottom hint
+    // Bottom hints
     private final BitmapText controlsHint;
+    private final BitmapText fireLockText;
+
+    // Difficulty-select panel
+    private final BitmapText  difficultyTitle;
+    private final ButtonPanel difficultyPanel;
+
+    // Pause menu panel (Resume / Restart / Settings / Quit)
+    private final ButtonPanel pausePanel;
+
+    // Settings menu panel (Fullscreen toggle / Back)
+    private final BitmapText  settingsTitle;
+    private final ButtonPanel settingsPanel;
+
+    // Weapon-select (up to 5 buttons + 2 nav buttons + title)
+    private static final int MAX_WEAPON_BUTTONS = 5;
+    private final BitmapText weaponSelectTitle;
+    private final Button[]   weaponButtons = new Button[MAX_WEAPON_BUTTONS];
+    private final Button     weaponNavNext;
+    private final Button     weaponNavPrev;
+
+    // Game-over restart button
+    private final Button gameOverRestartBtn;
 
     // ------------------------------------------------------------------
     // Constructor
@@ -64,29 +71,34 @@ public class HUD {
 
         BitmapFont font = assetManager.loadFont("Interface/Fonts/Default.fnt");
 
-        heartsText   = makeText(font, guiNode, 2.0f,  new ColorRGBA(1f, 0.3f, 0.3f, 1f));
-        levelText    = makeText(font, guiNode, 1.4f,  ColorRGBA.Yellow);
-        expText      = makeText(font, guiNode, 1.2f,  new ColorRGBA(0.4f, 1f, 0.5f, 1f));
-        creditsText  = makeText(font, guiNode, 1.2f,  new ColorRGBA(1f, 0.9f, 0.2f, 1f));
+        // ---- Left HUD ----
+        heartsText   = makeText(font, guiNode, 2.0f, new ColorRGBA(1f, 0.3f, 0.3f, 1f));
+        levelText    = makeText(font, guiNode, 1.4f, ColorRGBA.Yellow);
+        expText      = makeText(font, guiNode, 1.2f, new ColorRGBA(0.4f, 1f, 0.5f, 1f));
+        creditsText  = makeText(font, guiNode, 1.2f, new ColorRGBA(1f, 0.9f, 0.2f, 1f));
 
-        timeText      = makeText(font, guiNode, 1.4f,  ColorRGBA.White);
-        scoreText     = makeText(font, guiNode, 1.3f,  ColorRGBA.White);
-        blackHoleText = makeText(font, guiNode, 1.2f,  new ColorRGBA(0.4f, 0.0f, 1.0f, 1f));
+        // ---- Right HUD ----
+        timeText      = makeText(font, guiNode, 1.4f, ColorRGBA.White);
+        scoreText     = makeText(font, guiNode, 1.3f, ColorRGBA.White);
+        blackHoleText = makeText(font, guiNode, 1.2f, new ColorRGBA(0.4f, 0.0f, 1.0f, 1f));
 
+        // ---- Centre overlays ----
         centerMessage = makeText(font, guiNode, 3.0f, ColorRGBA.White);
         subMessage    = makeText(font, guiNode, 1.6f, ColorRGBA.LightGray);
 
-        weaponSelectTitle   = makeText(font, guiNode, 2.2f,  new ColorRGBA(1f, 0.85f, 0.2f, 1f));
-        weaponSelectOptions = makeText(font, guiNode, 1.4f,  ColorRGBA.White);
-        weaponSelectNav     = makeText(font, guiNode, 1.2f,  new ColorRGBA(0.6f, 0.6f, 0.6f, 1f));
-
-        controlsHint  = makeText(font, guiNode, 1.0f,
+        // ---- Bottom hints ----
+        controlsHint = makeText(font, guiNode, 1.0f,
                 new ColorRGBA(0.55f, 0.55f, 0.55f, 1f));
+        fireLockText = makeText(font, guiNode, 1.2f,
+                new ColorRGBA(1.0f, 0.6f, 0.0f, 1f));
 
-        controlsHint.setText("WASD: Move  |  LMB: Fire  |  Q/E: Cycle Weapon  |  P: Pause");
+        controlsHint.setText(
+                "WASD: Move  |  LMB: Fire  |  Q: Toggle Fire-Lock  |  E: Cycle Weapon  |  P/ESC: Pause");
         controlsHint.setLocalTranslation(10f, 28f, 0f);
+        fireLockText.setText("");
+        fireLockText.setLocalTranslation(10f, 50f, 0f);
 
-        // Initial placeholder text for correct first-frame sizing
+        // Placeholder text for correct first-frame sizing
         heartsText.setText("♥♥♥");
         levelText.setText("Lv 1");
         expText.setText("EXP: 0 / 100");
@@ -96,45 +108,86 @@ public class HUD {
         blackHoleText.setText("");
         centerMessage.setText("");
         subMessage.setText("");
-        weaponSelectTitle.setText("");
-        weaponSelectOptions.setText("");
-        weaponSelectNav.setText("");
 
         layoutStaticElements();
+
+        // ---- Difficulty select ----
+        difficultyTitle = makeText(font, guiNode, 2.4f,
+                new ColorRGBA(1f, 0.9f, 0.2f, 1f));
+        difficultyTitle.setText("");
+        difficultyTitle.setCullHint(Spatial.CullHint.Always);
+
+        difficultyPanel = new ButtonPanel(
+                assetManager, guiNode, font,
+                screenW * 0.5f, screenH * 0.38f,
+                320f, 52f, 14f,
+                "Easy", "Normal", "Hard", "Nightmare");
+
+        // ---- Pause menu ----
+        pausePanel = new ButtonPanel(
+                assetManager, guiNode, font,
+                screenW * 0.5f, screenH * 0.40f,
+                300f, 52f, 14f,
+                "Resume", "Restart", "Settings", "Quit");
+
+        // ---- Settings menu ----
+        settingsTitle = makeText(font, guiNode, 2.4f,
+                new ColorRGBA(1f, 0.9f, 0.2f, 1f));
+        settingsTitle.setText("");
+        settingsTitle.setCullHint(Spatial.CullHint.Always);
+
+        settingsPanel = new ButtonPanel(
+                assetManager, guiNode, font,
+                screenW * 0.5f, screenH * 0.42f,
+                320f, 52f, 14f,
+                "Fullscreen: OFF", "Back");
+
+        // ---- Weapon select ----
+        weaponSelectTitle = makeText(font, guiNode, 2.2f,
+                new ColorRGBA(1f, 0.85f, 0.2f, 1f));
+        weaponSelectTitle.setText("");
+        weaponSelectTitle.setCullHint(Spatial.CullHint.Always);
+
+        float wBtnW       = 640f;
+        float wBtnH       = 52f;
+        float wBtnSpacing = 10f;
+        float wBtnX       = screenW * 0.5f - wBtnW * 0.5f;
+        float wBtnStartY  = screenH * 0.72f;
+        for (int i = 0; i < MAX_WEAPON_BUTTONS; i++) {
+            float by = wBtnStartY - i * (wBtnH + wBtnSpacing);
+            weaponButtons[i] = new Button(assetManager, guiNode, font,
+                    "", wBtnX, by, wBtnW, wBtnH);
+        }
+
+        float navBtnW = 200f;
+        float navBtnH = 44f;
+        float navY    = wBtnStartY - MAX_WEAPON_BUTTONS * (wBtnH + wBtnSpacing) - 10f;
+        weaponNavPrev = new Button(assetManager, guiNode, font,
+                "[G] Prev Page",
+                screenW * 0.5f - navBtnW - 10f, navY, navBtnW, navBtnH);
+        weaponNavNext = new Button(assetManager, guiNode, font,
+                "[F] Next Page",
+                screenW * 0.5f + 10f, navY, navBtnW, navBtnH);
+
+        // ---- Game-over restart button ----
+        gameOverRestartBtn = new Button(assetManager, guiNode, font,
+                "Press R to Restart",
+                screenW * 0.5f - 150f, screenH * 0.35f, 300f, 52f);
     }
 
     // ------------------------------------------------------------------
     // Per-frame update
     // ------------------------------------------------------------------
-    /**
-     * Refreshes all dynamic HUD elements.
-     *
-     * @param player         player entity
-     * @param score          current score
-     * @param state          current game state
-     * @param waveTimer      wave countdown seconds (legacy)
-     * @param waitingForWave legacy flag
-     * @param tpf            delta time (for animation timers)
-     */
     public void update(Player player, int score,
                        GameState state, float waveTimer,
                        boolean waitingForWave, float tpf) {
 
-        // --- Hearts ---
         heartsText.setText(buildHearts(player.getHearts(), player.getMaxHearts()));
-
-        // --- Level & EXP ---
         levelText.setText("Lv " + player.getLevel());
         expText.setText("EXP: " + player.getCurrentExp() + " / " + player.getExpToNextLevel()
                 + "  " + buildBar(player.getCurrentExp(), player.getExpToNextLevel(), 14));
-
-        // --- Credits ---
         creditsText.setText("Credits: " + player.getCredits());
-
-        // --- Score ---
         scoreText.setText("Score: " + score);
-
-        // --- Re-position right column (they may have changed size) ---
         layoutRightColumn();
     }
 
@@ -148,102 +201,185 @@ public class HUD {
     }
 
     /**
-     * Legacy method kept for backward compatibility — updates only the time.
-     * The {@code circleVision} parameter is ignored; the vision system has been removed.
+     * Legacy method kept for backward compatibility.
      */
     public void updateTimeAndVision(float elapsedSeconds, boolean circleVision) {
         updateElapsedTime(elapsedSeconds);
     }
 
-    /**
-     * Updates the Pocket Black Hole status indicator.
-     *
-     * @param statusText the text to display, or empty string to hide it
-     */
     public void setBlackHoleStatus(String statusText) {
         blackHoleText.setText(statusText);
         layoutRightColumn();
     }
 
     // ------------------------------------------------------------------
-    // Weapon select overlay
+    // Resize support
     // ------------------------------------------------------------------
-
-    /**
-     * Shows the weapon selection overlay for the given page of weapons.
-     *
-     * @param pageWeapons  weapons on this page (up to 5)
-     * @param page         0-based current page index
-     * @param totalPages   total number of pages
-     */
-    public void showWeaponSelect(WeaponType[] pageWeapons, int page, int totalPages) {
-        weaponSelectTitle.setText("SELECT YOUR STARTING WEAPON  (Page " + (page + 1) + " / " + totalPages + ")");
-
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < pageWeapons.length; i++) {
-            WeaponType wt = pageWeapons[i];
-            WeaponStats s = wt.stats;
-            sb.append(String.format("[%d] %-22s  DMG: %-6.0f  RATE: %-5.1f  SPD: %.0f",
-                    i + 1, wt.displayName, s.damage, s.fireRate, s.bulletSpeed));
-            if (s.pelletsPerShot > 1) {
-                sb.append(String.format("  x%d pellets", s.pelletsPerShot));
-            }
-            if (s.pierce > 0) {
-                sb.append(String.format("  pierce:%d", s.pierce));
-            }
-            sb.append("\n");
+    public void onResize(int w, int h) {
+        this.screenW = w;
+        this.screenH = h;
+        layoutStaticElements();
+        if (!difficultyTitle.getText().isEmpty()) {
+            centreText(difficultyTitle, screenH * 0.62f);
         }
-        weaponSelectOptions.setText(sb.toString());
-        weaponSelectNav.setText("[F] Next Page   [G] Prev Page");
-        recenterWeaponSelect();
+        if (!settingsTitle.getText().isEmpty()) {
+            centreText(settingsTitle, screenH * 0.68f);
+        }
+        if (!weaponSelectTitle.getText().isEmpty()) {
+            centreText(weaponSelectTitle, screenH * 0.85f);
+        }
+        recenterMessage();
     }
 
-    /** Hides the weapon selection overlay. */
+    // ------------------------------------------------------------------
+    // Difficulty select
+    // ------------------------------------------------------------------
+    public void showDifficultySelect() {
+        difficultyTitle.setText("SELECT DIFFICULTY");
+        centreText(difficultyTitle, screenH * 0.62f);
+        difficultyTitle.setCullHint(Spatial.CullHint.Never);
+        difficultyPanel.show();
+    }
+
+    public void hideDifficultySelect() {
+        difficultyTitle.setText("");
+        difficultyTitle.setCullHint(Spatial.CullHint.Always);
+        difficultyPanel.hide();
+    }
+
+    public int getDifficultyClickedOption(float mx, float my) {
+        return difficultyPanel.getClickedButton(mx, my);
+    }
+
+    public void updateDifficultyHover(float mx, float my) {
+        difficultyPanel.updateHover(mx, my);
+    }
+
+    // ------------------------------------------------------------------
+    // Weapon select
+    // ------------------------------------------------------------------
+    public void showWeaponSelect(WeaponType[] pageWeapons, int page, int totalPages) {
+        weaponSelectTitle.setText(
+                "SELECT YOUR STARTING WEAPON  (Page " + (page + 1) + " / " + totalPages + ")");
+        centreText(weaponSelectTitle, screenH * 0.85f);
+        weaponSelectTitle.setCullHint(Spatial.CullHint.Never);
+
+        for (int i = 0; i < MAX_WEAPON_BUTTONS; i++) {
+            if (i < pageWeapons.length) {
+                WeaponType wt = pageWeapons[i];
+                WeaponStats s = wt.stats;
+                StringBuilder sb = new StringBuilder();
+                sb.append(String.format("[%d] %-20s  DMG:%-6.0f  RATE:%-5.1f  SPD:%.0f",
+                        i + 1, wt.displayName, s.damage, s.fireRate, s.bulletSpeed));
+                if (s.pelletsPerShot > 1) {
+                    sb.append(String.format("  x%d pellets", s.pelletsPerShot));
+                }
+                if (s.pierce > 0) {
+                    sb.append(String.format("  pierce:%d", s.pierce));
+                }
+                weaponButtons[i].setText(sb.toString());
+                weaponButtons[i].show();
+            } else {
+                weaponButtons[i].setText("");
+                weaponButtons[i].hide();
+            }
+        }
+        weaponNavNext.show();
+        weaponNavPrev.show();
+    }
+
     public void hideWeaponSelect() {
         weaponSelectTitle.setText("");
-        weaponSelectOptions.setText("");
-        weaponSelectNav.setText("");
+        weaponSelectTitle.setCullHint(Spatial.CullHint.Always);
+        for (Button b : weaponButtons) b.hide();
+        weaponNavNext.hide();
+        weaponNavPrev.hide();
+    }
+
+    public int getWeaponClickedOption(float mx, float my) {
+        for (int i = 0; i < MAX_WEAPON_BUTTONS; i++) {
+            if (weaponButtons[i].hitTest(mx, my)) return i;
+        }
+        return -1;
+    }
+
+    public void updateWeaponSelectHover(float mx, float my) {
+        for (Button b : weaponButtons) b.setHovered(b.hitTest(mx, my));
+        weaponNavNext.setHovered(weaponNavNext.hitTest(mx, my));
+        weaponNavPrev.setHovered(weaponNavPrev.hitTest(mx, my));
+    }
+
+    // ------------------------------------------------------------------
+    // Pause menu
+    // ------------------------------------------------------------------
+    public void showPauseOverlay(boolean show) {
+        if (show) {
+            centerMessage.setColor(ColorRGBA.White);
+            centerMessage.setText("PAUSED");
+            subMessage.setText("P / ESC to Resume");
+            recenterMessage();
+            pausePanel.show();
+        } else {
+            centerMessage.setText("");
+            subMessage.setText("");
+            pausePanel.hide();
+        }
+    }
+
+    /** Returns 0=Resume, 1=Restart, 2=Settings, 3=Quit, or -1. */
+    public int getPauseMenuClickedOption(float mx, float my) {
+        return pausePanel.getClickedButton(mx, my);
+    }
+
+    public void updatePauseMenuHover(float mx, float my) {
+        pausePanel.updateHover(mx, my);
+    }
+
+    // ------------------------------------------------------------------
+    // Settings menu
+    // ------------------------------------------------------------------
+    public void showSettingsMenu() {
+        settingsTitle.setText("SETTINGS");
+        centreText(settingsTitle, screenH * 0.68f);
+        settingsTitle.setCullHint(Spatial.CullHint.Never);
+        settingsPanel.show();
+    }
+
+    public void hideSettingsMenu() {
+        settingsTitle.setText("");
+        settingsTitle.setCullHint(Spatial.CullHint.Always);
+        settingsPanel.hide();
+    }
+
+    /** Returns 0=Fullscreen toggle, 1=Back, or -1. */
+    public int getSettingsClickedOption(float mx, float my) {
+        return settingsPanel.getClickedButton(mx, my);
+    }
+
+    public void updateSettingsHover(float mx, float my) {
+        settingsPanel.updateHover(mx, my);
+    }
+
+    public void setFullscreenLabel(boolean isFullscreen) {
+        settingsPanel.getButton(0).setText(
+                isFullscreen ? "Fullscreen: ON" : "Fullscreen: OFF");
     }
 
     // ------------------------------------------------------------------
     // One-shot state methods
     // ------------------------------------------------------------------
-    /** Shows or hides the PAUSED overlay. */
-    public void showPauseOverlay(boolean show) {
-        if (show) {
-            centerMessage.setColor(ColorRGBA.White);
-            centerMessage.setText("PAUSED");
-            subMessage.setText("Press P to Resume");
-        } else {
-            centerMessage.setText("");
-            subMessage.setText("");
-        }
-        recenterMessage();
+    public void setFireLockStatus(boolean locked) {
+        fireLockText.setText(locked ? "[Q] FIRE LOCKED" : "");
     }
 
-    /** Shows the GAME OVER overlay. */
     public void showGameOverOverlay(int finalScore) {
         centerMessage.setColor(ColorRGBA.Red);
         centerMessage.setText("GAME OVER");
-        subMessage.setText("Final Score: " + finalScore + "   |   Press R to Restart");
+        subMessage.setText("Final Score: " + finalScore);
         recenterMessage();
+        gameOverRestartBtn.show();
     }
 
-    /** Shows a difficulty-select prompt. */
-    public void showDifficultySelect() {
-        centerMessage.setColor(new ColorRGBA(1f, 0.9f, 0.2f, 1f));
-        centerMessage.setText("SELECT DIFFICULTY");
-        subMessage.setText("[1] Easy   [2] Normal   [3] Hard   [4] Nightmare");
-        recenterMessage();
-    }
-
-    /** Hides difficulty-select and main overlays. */
-    public void hideDifficultySelect() {
-        centerMessage.setText("");
-        subMessage.setText("");
-    }
-
-    /** Shows a boss-warning banner. */
     public void showBossWarning(String bossName) {
         centerMessage.setColor(new ColorRGBA(1f, 0.2f, 0.2f, 1f));
         centerMessage.setText("!! BOSS -- " + bossName + " !!");
@@ -251,12 +387,19 @@ public class HUD {
         recenterMessage();
     }
 
-    /** Clears all overlay messages — called on restart. */
     public void reset() {
         centerMessage.setText("");
         subMessage.setText("");
         centerMessage.setColor(ColorRGBA.White);
         blackHoleText.setText("");
+        fireLockText.setText("");
+        pausePanel.hide();
+        difficultyPanel.hide();
+        difficultyTitle.setText("");
+        difficultyTitle.setCullHint(Spatial.CullHint.Always);
+        hideSettingsMenu();
+        hideWeaponSelect();
+        gameOverRestartBtn.hide();
     }
 
     // ------------------------------------------------------------------
@@ -272,7 +415,7 @@ public class HUD {
     }
 
     private void layoutStaticElements() {
-        float lineH = heartsText.getSize() * 1.6f;
+        float lineH  = heartsText.getSize() * 1.6f;
         float startY = screenH - 14f;
         heartsText.setLocalTranslation(12f, startY, 0f);
         levelText.setLocalTranslation(12f, startY - lineH, 0f);
@@ -307,18 +450,12 @@ public class HUD {
         }
     }
 
-    private void recenterWeaponSelect() {
-        float titleX = Math.max(0f, (screenW - weaponSelectTitle.getLineWidth()) * 0.5f);
-        float titleY = screenH * 0.85f;
-        weaponSelectTitle.setLocalTranslation(titleX, titleY, 0f);
-        weaponSelectOptions.setLocalTranslation(40f, titleY - weaponSelectTitle.getSize() * 2f, 0f);
-        float navY = titleY - weaponSelectTitle.getSize() * 2f
-                   - weaponSelectOptions.getSize() * 7f;
-        float navX = Math.max(0f, (screenW - weaponSelectNav.getLineWidth()) * 0.5f);
-        weaponSelectNav.setLocalTranslation(navX, navY, 0f);
+    private void centreText(BitmapText t, float y) {
+        float lw = t.getLineWidth();
+        float x  = lw > 0f ? Math.max(0f, (screenW - lw) * 0.5f) : screenW * 0.5f - 100f;
+        t.setLocalTranslation(x, y, 0f);
     }
 
-    /** Heart symbols — filled ♥ for current HP, empty ♡ for lost. */
     private String buildHearts(int current, int max) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < max; i++) {
