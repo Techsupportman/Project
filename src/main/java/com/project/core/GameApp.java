@@ -155,7 +155,7 @@ public class GameApp extends SimpleApplication {
     public void reshape(int w, int h) {
         super.reshape(w, h);
         updateCameraFrustum(w, h);
-        uiManager.onResize(w, h);
+        if (uiManager != null) uiManager.onResize(w, h);
     }
 
     // -- Difficulty --
@@ -267,7 +267,6 @@ public class GameApp extends SimpleApplication {
             fireLocked = !fireLocked;
             uiManager.setFireLockStatus(fireLocked);
         }
-        if (inputHandler.isCycleWeaponPressed()) player.cycleWeapon();
 
         float dx = 0f, dz = 0f;
         if (inputHandler.isMoveLeft())  dx -= 1f;
@@ -577,6 +576,7 @@ public class GameApp extends SimpleApplication {
     }
 
     private void updateCameraFrustum(int w, int h) {
+        if (cam == null) return;
         float aspect=((float)w)/h, viewHalfH=Constants.LEVEL_HALF_HEIGHT+1.5f, viewHalfW=viewHalfH*aspect;
         cam.setFrustum(-1000f, 1000f, -viewHalfW, viewHalfW, -viewHalfH, viewHalfH);
     }

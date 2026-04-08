@@ -19,7 +19,7 @@ src/main/java/com/project/
 ├── entities/
 │   ├── GameObject.java        – Abstract base: position, size, AABB collision, scene Node
 │   ├── Player.java            – Heart HP, ranged weapon, aim direction, EXP/level, credits
-│   ├── Enemy.java             – Multiple EnemyType variants; vision-based visibility
+│   ├── Enemy.java             – Multiple EnemyType variants
 │   ├── EnemyType.java         – 8 standard + 2 mini-bosses + 5 bosses with unlock times
 │   ├── Projectile.java        – Bullet: direction, speed, pierce, ricochet
 │   └── Pickup.java            – Heart / EXP / Mutation collectible
@@ -32,14 +32,13 @@ src/main/java/com/project/
 │   ├── CombatSystem.java      – Enemy contact damage (1 heart per hit)
 │   ├── PhysicsSystem.java     – AABB overlap resolution
 │   ├── ProjectileSystem.java  – Move bullets, test against enemies, apply pierce
-│   ├── SpawnManager.java      – Time-based continuous spawning: standard → mini-boss → boss
-│   └── VisionSystem.java      – Circle / Cone visibility per enemy and pickup
+│   └── SpawnManager.java      – Time-based continuous spawning: standard → mini-boss → boss
 ├── upgrades/
 │   ├── Upgrade.java           – Single upgrade node (id, parent, branch, name, magnitude)
 │   ├── UpgradeTree.java       – 7-node tree with exclusive A/B branching
 │   └── UpgradeManager.java    – 5 trees, generate choices, apply, reroll, delete
 ├── ui/
-│   ├── HUD.java               – Hearts, level/EXP, credits, time, vision mode, score
+│   ├── HUD.java               – Hearts, level/EXP, credits, time, score
 │   ├── UIManager.java         – Facade over HUD + LevelUpMenu
 │   └── LevelUpMenu.java       – Level-up overlay: 3-5 upgrade options, reroll, delete
 ├── levels/
@@ -48,7 +47,7 @@ src/main/java/com/project/
 │   └── Level1.java            – The arena: dark floor, grid lines, boundary walls
 ├── utils/
 │   ├── Constants.java         – All tunable numbers in one place
-│   ├── InputHandler.java      – Keyboard + mouse state (movement, fire, vision toggle, choices)
+│   ├── InputHandler.java      – Keyboard + mouse state (movement, fire, choices)
 │   └── Vector2D.java          – Lightweight XZ-plane vector maths
 └── assets/
     ├── PlaceholderGenerator.java – Labelled coloured boxes (replace with real art later)
@@ -63,9 +62,7 @@ src/main/java/com/project/
 |---|---|
 | **Difficulty selection** | Easy (6 HP) / Normal (3 HP) / Hard / Nightmare — stat multipliers applied to all systems |
 | **Ranged combat** | Left-click to fire toward the mouse cursor; weapon auto-fires while held |
-| **18 Weapon types** | Pistol → Rocket; unlock with Credits; each has unique damage/fire rate/pierce/ricochet/spread |
-| **Vision modes** | **Circle** — reveals all nearby enemies in 360°; **Cone** — reveals a directional area farther away; toggle with **RMB** |
-| **Fog of darkness** | Enemies and EXP are invisible outside vision range (cull-hint based) |
+| **18 Weapon types** | Pistol → Rocket; chosen at game start; each has unique damage/fire rate/pierce/ricochet/spread |
 | **Continuous spawning** | Time-based spawn manager: faster spawns over time, new enemy types unlock at timed thresholds |
 | **8 standard enemy types** | Basic, Runner, Tank, Shooter, Swarm, Bruiser, Specter, Artillery |
 | **Mini-bosses** | Alpha / Beta mini-bosses spawn every ~90 seconds |
@@ -76,10 +73,10 @@ src/main/java/com/project/
 | **5 Upgrade trees** | Damage, Fire Rate, Vitality, Mobility, Piercing — 7 nodes each with exclusive A/B branches |
 | **Level-up menu** | 3–5 random options; one Reroll and one Delete available per level |
 | **Credits** | Accumulated as Score × 0.1; spend to unlock weapons |
-| **HUD** | Hearts, Lv/EXP bar, Credits, MM:SS timer, Vision indicator, Score |
-| **Pause / Resume** | P key |
+| **HUD** | Hearts, Lv/EXP bar, Credits, MM:SS timer, Score |
+| **Pause / Resume** | ESC key |
 | **Game Over / Restart** | Returns to difficulty select on R |
-| **Unit tests** | 40 tests covering engine, vision, weapons, upgrades, difficulty, vector maths |
+| **Unit tests** | 34 tests covering engine, weapons, upgrades, difficulty, vector maths |
 
 ---
 
@@ -89,9 +86,8 @@ src/main/java/com/project/
 |---|---|
 | W / A / S / D | Move |
 | **Left Mouse Button** (hold) | Fire active weapon toward cursor |
-| **Right Mouse Button** | Toggle Circle / Cone vision |
-| Q / E | Cycle to next unlocked weapon |
-| P | Pause / Resume |
+| Q | Toggle Fire-Lock (auto-fire) |
+| ESC | Pause / Resume |
 | R | Restart (when Game Over) |
 | 1 – 5 | Choose upgrade in level-up menu |
 | F | Reroll upgrade choices (once per level) |

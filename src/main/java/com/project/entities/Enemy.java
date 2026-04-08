@@ -28,11 +28,6 @@ public class Enemy extends GameObject {
     private float attackCooldown;
 
     // ------------------------------------------------------------------
-    // Visibility (set by VisionSystem each frame)
-    // ------------------------------------------------------------------
-    private boolean visibleToPlayer = false;
-
-    // ------------------------------------------------------------------
     // Constructor
     // ------------------------------------------------------------------
     public Enemy(AssetManager assetManager, float x, float z, EnemyType type, Difficulty difficulty) {
@@ -52,9 +47,6 @@ public class Enemy extends GameObject {
                 type.displayName.toUpperCase(),
                 sz, sz, color
         ));
-
-        // Bosses/mini-bosses start visible so the player always sees them
-        if (type.isAnyBoss()) visibleToPlayer = true;
     }
 
     /** Legacy constructor — creates a BASIC enemy on NORMAL difficulty. */
@@ -124,19 +116,6 @@ public class Enemy extends GameObject {
     /** @return {@code true} when health has reached zero. */
     public boolean isDead() {
         return health <= 0f;
-    }
-
-    // ------------------------------------------------------------------
-    // Vision
-    // ------------------------------------------------------------------
-    /** Called by {@link com.project.systems.VisionSystem} each frame. */
-    public void setVisibleToPlayer(boolean visible) {
-        this.visibleToPlayer = visible;
-    }
-
-    /** @return {@code true} when this enemy is inside the player's vision. */
-    public boolean isVisibleToPlayer() {
-        return visibleToPlayer;
     }
 
     // ------------------------------------------------------------------

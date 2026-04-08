@@ -27,7 +27,6 @@ import java.util.List;
  * <ul>
  *   <li>WASD — movement</li>
  *   <li>Left Mouse Button (held) — fire active weapon toward cursor</li>
- *   <li>Right Mouse Button — toggle circle / cone vision</li>
  * </ul>
  */
 public class Player extends GameObject {
@@ -65,12 +64,6 @@ public class Player extends GameObject {
     // Credits
     // ------------------------------------------------------------------
     private int credits = 0;
-
-    // ------------------------------------------------------------------
-    // Vision mode
-    // ------------------------------------------------------------------
-    /** {@code true} = circle vision; {@code false} = cone vision. */
-    private boolean circleVisionMode = true;
 
     // ------------------------------------------------------------------
     // Constructor
@@ -219,14 +212,6 @@ public class Player extends GameObject {
     }
 
     // ------------------------------------------------------------------
-    // Vision toggle
-    // ------------------------------------------------------------------
-    /** Toggles between circle and cone vision modes. */
-    public void toggleVisionMode() {
-        circleVisionMode = !circleVisionMode;
-    }
-
-    // ------------------------------------------------------------------
     // Combat (receiving damage)
     // ------------------------------------------------------------------
     /**
@@ -306,7 +291,6 @@ public class Player extends GameObject {
     public int   getCredits()         { return credits; }
     public float getAimDirX()         { return aimDirX; }
     public float getAimDirZ()         { return aimDirZ; }
-    public boolean isCircleVision()   { return circleVisionMode; }
     public List<Weapon> getWeapons()  { return weapons; }
 
     // Legacy health accessors kept for backward compatibility with tests/HUD
